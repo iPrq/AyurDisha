@@ -33,6 +33,11 @@ class Settings(BaseModel):
     section3_weight_e: float = Field(default=0.30)
     section3_weight_p: float = Field(default=0.35)
 
+    # Focused Section 3 statute retrieval (domestic India only): minimum candidate count
+    # requested from the hybrid retriever (raised to DENSE_CANDIDATES + BM25_CANDIDATES
+    # if smaller); results are then restricted to Section 3 chunks.
+    section3_statute_top_k: int = Field(default=30)
+
     # Confidence / escalation placeholders
     botanical_confidence_threshold: float = Field(default=0.7)
     verification_min_support_ratio: float = Field(default=0.6)
@@ -115,6 +120,7 @@ def get_settings() -> Settings:
         section3_weight_d=_env_float("SECTION3_WEIGHT_D", 0.35),
         section3_weight_e=_env_float("SECTION3_WEIGHT_E", 0.30),
         section3_weight_p=_env_float("SECTION3_WEIGHT_P", 0.35),
+        section3_statute_top_k=_env_int("SECTION3_STATUTE_TOP_K", 30),
         botanical_confidence_threshold=_env_float(
             "BOTANICAL_CONFIDENCE_THRESHOLD", 0.7
         ),

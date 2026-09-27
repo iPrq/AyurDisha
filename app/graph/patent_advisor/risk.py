@@ -18,6 +18,10 @@ def calculate_patentability_risk(
 ) -> PatentabilityRiskIndicator:
     """Rule-based risk = sum of weights for triggered 3(d)/3(e)/3(p).
 
+    Each clause counts at most once. Triggered clauses without a configured weight
+    add nothing (no weights are invented) and are listed in
+    ``unweighted_triggered_clauses``.
+
     This is decision-support only — not a probability of patent approval.
     """
     cfg = settings or get_settings()
@@ -29,13 +33,17 @@ def calculate_patentability_risk(
 
     score = 0.0
     triggered: list[Section3Clause] = []
+    unweighted: list[Section3Clause] = []
     for provision in section3.provisions:
         clause = provision.clause
         if isinstance(clause, str):
             clause = Section3Clause(clause)
-        if provision.triggered:
-            score += weights.get(clause, 0.0)
+        if provision.triggered and clause not in triggered:
             triggered.append(clause)
+            if clause in weights:
+                score += weights[clause]
+            else:
+                unweighted.append(clause)
 
     # Cap at 1.0 in case weights are misconfigured above 1 combined
     score = min(1.0, max(0.0, score))
@@ -43,6 +51,7 @@ def calculate_patentability_risk(
     return PatentabilityRiskIndicator(
         score=score,
         triggered_clauses=triggered,
+        unweighted_triggered_clauses=unweighted,
         weight_d=cfg.section3_weight_d,
         weight_e=cfg.section3_weight_e,
         weight_p=cfg.section3_weight_p,

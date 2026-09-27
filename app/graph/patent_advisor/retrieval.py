@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from graph.models import LegalScope
+from config import Settings, get_settings
+from graph.models import SUPPORTED_SECTION3_CLAUSES, LegalScope, RetrievedSource
 from graph.state import PatentAdvisorState
 from retrieval.base import LegalRetriever
 from retrieval.mock import get_mock_retriever
@@ -28,10 +29,46 @@ def _build_query(state: PatentAdvisorState) -> str:
     return " ".join(parts)
 
 
+SECTION3_STATUTE_SOURCE_TYPES = ["statute"]
+# Section labels kept from the focused statute retrieval: the preamble ("3") and
+# the supported clauses. Anything else (other sections, other clauses) is dropped.
+_SECTION3_SECTION_LABELS = frozenset({"3", *SUPPORTED_SECTION3_CLAUSES})
+
+
+def _build_section3_statute_query(state: PatentAdvisorState) -> str:
+    """Query naming every supported clause ref so BM25 can match each clause chunk."""
+    parts: list[str] = ["Section 3", *SUPPORTED_SECTION3_CLAUSES]
+    for key in ("botanical_name", "product"):
+        if state.get(key):
+            parts.append(str(state[key]))
+    return " ".join(parts)
+
+
+def _wants_section3_statutes(jurisdiction: str, legal_scope: LegalScope | str) -> bool:
+    scope_val = (
+        legal_scope.value if isinstance(legal_scope, LegalScope) else str(legal_scope)
+    ).lower()
+    return scope_val == LegalScope.DOMESTIC.value and jurisdiction.strip().lower() == "india"
+
+
+def _merge_sources(
+    primary: list[RetrievedSource], extra: list[RetrievedSource]
+) -> list[RetrievedSource]:
+    """Keep ``primary`` order; append unseen ``extra`` sources (dedupe by id)."""
+    seen = {s.id for s in primary}
+    merged = list(primary)
+    for s in extra:
+        if s.id not in seen:
+            seen.add(s.id)
+            merged.append(s)
+    return merged
+
+
 def legal_patent_retrieval_node(
     state: PatentAdvisorState,
     *,
     retriever: LegalRetriever | None = None,
+    settings: Settings | None = None,
 ) -> dict[str, Any]:
     client = retriever or get_mock_retriever()
     jurisdiction = state.get("jurisdiction") or "india"
@@ -42,6 +79,29 @@ def legal_patent_retrieval_node(
         jurisdiction=jurisdiction,
         legal_scope=legal_scope,
     )
+
+    # Focused statute retrieval so Section 3 reliably sees the clause chunks.
+    # Same retriever (Qdrant + BM25 + RRF [+ rerank]) and filters; domestic India only.
+    if _wants_section3_statutes(jurisdiction, legal_scope):
+        cfg = settings or get_settings()
+        # Request every fused candidate (dense + BM25) so rank fusion cannot cut a
+        # clause found by only one of the two searches before the Section 3 filter.
+        top_k = max(cfg.section3_statute_top_k, cfg.dense_candidates + cfg.bm25_candidates)
+        statute_sources = client.retrieve(
+            _build_section3_statute_query(state),
+            jurisdiction=jurisdiction,
+            legal_scope=legal_scope,
+            top_k=top_k,
+            source_types=SECTION3_STATUTE_SOURCE_TYPES,
+        )
+        # Rank alone can drop long clauses (e.g. one with an Explanation) behind
+        # unrelated sections, so request a wide candidate set and keep Section 3 only.
+        statute_sources = [
+            s
+            for s in statute_sources
+            if (s.section or "").strip().lower() in _SECTION3_SECTION_LABELS
+        ]
+        sources = _merge_sources(sources, statute_sources)
 
     update: dict[str, Any] = {
         "retrieved_sources": sources,
@@ -65,8 +125,10 @@ def legal_patent_retrieval_node(
     return update
 
 
-def make_retrieval_node(*, retriever: LegalRetriever | None = None):
+def make_retrieval_node(
+    *, retriever: LegalRetriever | None = None, settings: Settings | None = None
+):
     def _node(state: PatentAdvisorState) -> dict[str, Any]:
-        return legal_patent_retrieval_node(state, retriever=retriever)
+        return legal_patent_retrieval_node(state, retriever=retriever, settings=settings)
 
     return _node

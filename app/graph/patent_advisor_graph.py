@@ -36,7 +36,7 @@ def build_patent_advisor_graph(
         return botanical_normalizer_node(state, kg=kg, settings=cfg, llm=model)
 
     def _retrieval(state: PatentAdvisorState) -> dict[str, Any]:
-        return legal_patent_retrieval_node(state, retriever=retriever)
+        return legal_patent_retrieval_node(state, retriever=retriever, settings=cfg)
 
     def _section3(state: PatentAdvisorState) -> dict[str, Any]:
         return section3_scorer_node(state, settings=cfg, llm=model)

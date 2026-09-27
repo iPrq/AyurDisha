@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from enum import Enum
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 # ---------------------------------------------------------------------------
@@ -39,11 +40,54 @@ class VerificationOutcome(str, Enum):
 
 
 class Section3Clause(str, Enum):
-    """Indian Patents Act Section 3 provisions of primary interest."""
+    """Indian Patents Act Section 3 clauses supported by the Section 3 analyzer.
 
+    3(g) is intentionally NOT a member: it is never an active provision in
+    AyurDisha (see ``UNSUPPORTED_SECTION3_CLAUSES``).
+    """
+
+    A = "3(a)"
+    B = "3(b)"
+    C = "3(c)"
     D = "3(d)"
     E = "3(e)"
+    F = "3(f)"
+    H = "3(h)"
+    I = "3(i)"  # noqa: E741 - clause letter
+    J = "3(j)"
+    K = "3(k)"
+    L = "3(l)"
+    M = "3(m)"
+    N = "3(n)"
+    O = "3(o)"  # noqa: E741 - clause letter
     P = "3(p)"
+
+
+# Single source of truth for the supported clause references, e.g. "3(a)".
+SUPPORTED_SECTION3_CLAUSES: tuple[str, ...] = tuple(c.value for c in Section3Clause)
+
+# Clause references deliberately excluded from analysis. 3(g) must never be
+# treated as an active provision; it is recorded as rejected if a model returns it.
+UNSUPPORTED_SECTION3_CLAUSES: frozenset[str] = frozenset({"3(g)"})
+
+_SECTION3_REF_RE = re.compile(
+    r"^\s*(?:section\s*)?3\s*\(\s*([a-z])\s*\)\s*$", re.IGNORECASE
+)
+
+
+def normalize_section3_clause_ref(value: object) -> object:
+    """Normalize model-output variants ("3 (k)", "Section 3(k)", "3(K)") to "3(k)".
+
+    Non-matching values are returned unchanged so validation can reject them.
+    """
+    if isinstance(value, Section3Clause):
+        return value
+    if isinstance(value, str):
+        m = _SECTION3_REF_RE.match(value)
+        if m:
+            return f"3({m.group(1).lower()})"
+        return value.strip()
+    return value
 
 
 class IPRouteType(str, Enum):
@@ -132,6 +176,15 @@ class Section3ProvisionResult(BaseModel):
     reason: str = ""
     evidence_source_ids: list[str] = Field(default_factory=list)
     evidence_kind: EvidenceKind = EvidenceKind.MODEL_INTERPRETATION
+    evidence_gap: bool = Field(
+        default=False,
+        description="True when a trigger was cleared because no valid retrieved evidence remained",
+    )
+
+    @field_validator("clause", mode="before")
+    @classmethod
+    def _normalize_clause(cls, v: Any) -> Any:
+        return normalize_section3_clause_ref(v)
 
 
 class Section3Results(BaseModel):
@@ -140,6 +193,36 @@ class Section3Results(BaseModel):
     jurisdiction: str = "india"
     legal_scope: LegalScope = LegalScope.DOMESTIC
     insufficient_evidence: bool = False
+    rejected_clauses: list[str] = Field(
+        default_factory=list,
+        description="Clause references returned by the model that are not supported (e.g. 3(g)); dropped",
+    )
+    evidence_gap_clauses: list[Section3Clause] = Field(
+        default_factory=list,
+        description="Clauses whose trigger was cleared for lack of valid retrieved evidence",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_unsupported_clauses(cls, data: Any) -> Any:
+        """Reject unsupported clauses (3(g), 3(q), ...) safely instead of failing the request."""
+        if not isinstance(data, dict) or not isinstance(data.get("provisions"), list):
+            return data
+        kept: list[Any] = []
+        rejected = list(data.get("rejected_clauses") or [])
+        for item in data["provisions"]:
+            if isinstance(item, Section3ProvisionResult):
+                kept.append(item)
+                continue
+            raw = item.get("clause") if isinstance(item, dict) else None
+            ref = normalize_section3_clause_ref(raw)
+            if isinstance(ref, Section3Clause) or ref in SUPPORTED_SECTION3_CLAUSES:
+                kept.append(item)
+            else:
+                label = str(ref) if ref not in (None, "") else "<missing clause>"
+                if label not in rejected:
+                    rejected.append(label)
+        return {**data, "provisions": kept, "rejected_clauses": rejected}
 
 
 class PatentabilityRiskIndicator(BaseModel):
@@ -151,6 +234,13 @@ class PatentabilityRiskIndicator(BaseModel):
         description="Weighted sum of triggered Section 3 provisions",
     )
     triggered_clauses: list[Section3Clause] = Field(default_factory=list)
+    unweighted_triggered_clauses: list[Section3Clause] = Field(
+        default_factory=list,
+        description=(
+            "Triggered clauses with no configured risk weight; they add nothing to "
+            "score (no weights are invented) and need separate human consideration"
+        ),
+    )
     weight_d: float = 0.35
     weight_e: float = 0.30
     weight_p: float = 0.35
