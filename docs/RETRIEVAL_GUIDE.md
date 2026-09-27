@@ -151,9 +151,12 @@ a `.json` list or `.jsonl` of records:
 | `guideline` / `comparative_ip` | Heading + paragraph groups (≤ ~1500 chars, paragraphs never split) | `ipo_tk_guidelines_p004` |
 | `patent` | Abstract + first claim | `patent_in123456_abstract`, `patent_in123456_claim_1` |
 
-Statute clause detection accepts `(x)` markers in increasing letter order, so nested
-`(i)/(ii)` lists inside a clause stay with that clause. Check chunk output for new
-statutes before ingesting (§6).
+Statute clause detection accepts `(x)` markers in increasing letter order. Roman-looking
+markers `(i)`, `(v)`, `(x)` count as top-level clauses only when they are the next letter in
+sequence (e.g. `(i)` directly after `(h)`) and are not followed by `(ii)`, so nested
+`(i)/(ii)` lists stay with their clause even before clause (i). A clause whose body is only an
+omission marker (e.g. `[Omitted]`, `* * *`) produces **no chunk** (logged), so an omitted 3(g)
+never becomes an active provision. Check chunk output for new statutes before ingesting (§6).
 
 ### Corpus priorities and licensing
 
@@ -355,6 +358,6 @@ graph structure:
 
 | Node | Query focus | `source_types` |
 |------|-------------|----------------|
-| Section 3 | Section 3(d)/(e)/(p), botanical name, formulation, ingredients | `["statute", "guideline"]` |
+| Section 3 | **Wired:** domestic India adds a statute-only query naming all 15 supported clauses (`SECTION3_STATUTE_TOP_K` candidates, kept only if labeled Section 3 / a supported clause) | `["statute"]` |
 | Prior art | botanical name, synonyms, phytochemicals (`botanical_synonyms`, `phytochemicals` in state), product | `["patent"]` |
 | IP routes | product type, trademark, design, trade secret | `["guideline"]` |

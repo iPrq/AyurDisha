@@ -137,10 +137,12 @@ curl -X POST http://127.0.0.1:8000/api/v1/patent-advisor `
     "phytochemicals": ["withanolides", "..."],
     "confidence": 0.95
   },
-  "section3": { "provisions": [ /* 3(d), 3(e), 3(p) */ ], "summary": "..." },
+  "section3": { "provisions": [ /* any of the 15 supported clauses */ ], "summary": "...",
+                "rejected_clauses": [], "evidence_gap_clauses": [] },
   "patentability_risk": {
     "score": 0.7,
     "triggered_clauses": ["3(d)", "3(p)"],
+    "unweighted_triggered_clauses": [],
     "label": "decision_support_risk_indicator"
   },
   "prior_art": { "findings": [], "summary": "..." },
@@ -181,7 +183,7 @@ app/
       input_parser.py
     patent_advisor/
       retrieval.py                 # retrieval node (scope-aware)
-      section3.py                  # 3(d)/3(e)/3(p) scorer
+      section3.py                  # Section 3 scorer (15 clauses; no 3(g))
       risk.py                      # deterministic risk = Σ weights
       prior_art.py
       ip_routes.py
@@ -238,6 +240,19 @@ risk = min(1.0, risk)
 ```
 
 Implemented in `graph/patent_advisor/risk.py` — **Python only**, never asked of an LLM.
+
+Supported Section 3 clauses: 3(a), 3(b), 3(c), 3(d), 3(e), 3(f), 3(h), 3(i), 3(j), 3(k),
+3(l), 3(m), 3(n), 3(o), 3(p) (`SUPPORTED_SECTION3_CLAUSES` in `graph/models.py`). 3(g) is
+never an active provision; if the model returns it (or any other unsupported clause) it is
+dropped, recorded in `rejected_clauses`, and escalated as `unsupported_section3_clause`.
+Only 3(d)/3(e)/3(p) have weights. Other triggered clauses add **nothing** to the score (no
+weights are invented) and are listed in `unweighted_triggered_clauses`. Each clause counts once.
+
+Evidence validation (`section3.py`): a cited `evidence_source_id` is kept only if it is a
+retrieved source and that source is unlabeled (guideline, preamble, patent) or labeled with
+the same clause. A triggered clause left without valid evidence is cleared, marked
+`evidence_gap`, listed in `evidence_gap_clauses`, and escalated as `section3_evidence_gap`,
+which the shared verifier always turns into `HUMAN_REVIEW_REQUIRED`.
 
 ### 5.4 Mock fixtures vs real infra
 
