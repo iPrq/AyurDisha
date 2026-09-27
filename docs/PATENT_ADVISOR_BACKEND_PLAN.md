@@ -14,6 +14,53 @@
 - [x] Phase 6: Patent Advisor graph (Section 3, prior art, IP routes, risk indicator)
 - [x] Phase 6: `POST /api/v1/patent-advisor` FastAPI endpoint (backend only)
 - [x] Phase 6: Tests for shared components + Patent Advisor (no paid API)
+- [x] Phase 7: Product Review graph + `POST /api/v1/product-review` (web search evidence)
+- [x] Phase 8: NBA / ABS graph + `POST /api/v1/nba-abs` (deterministic fee calculator)
+
+---
+
+## Phase 7 — Product Review (built)
+
+```mermaid
+flowchart TD
+  startNode[START] --> parser[InputParser]
+  parser --> botanical[SharedBotanicalNormalizer_all_ingredients]
+  botanical --> market[MarketFeasibility]
+  botanical --> legal[LegalCompliance]
+  botanical --> resource[ResourceAccessibility]
+  market --> aggregator[ProductReviewAggregator]
+  legal --> aggregator
+  resource --> aggregator
+  aggregator --> verifier[SharedCriticVerifier]
+  verifier --> endNode[END]
+```
+
+- The three dimensions run **in parallel**; each writes its own state keys, and `escalation_reasons` merges via a reducer (`graph/state.py::merge_unique`).
+- **Market Feasibility**: web search (competitors, brands, demand). Competitors without a valid citation are dropped.
+- **Legal Compliance**: `source_types=["regulation"]` corpus retrieval + web search restricted to Indian regulator domains (`ayush.gov.in`, `cdsco.gov.in`, `fssai.gov.in`, `indiacode.nic.in`, `egazette.gov.in`) in domestic mode. International mode never invents foreign law.
+- **Resource Accessibility**: per botanical (capped by `PRODUCT_REVIEW_MAX_RESOURCES`): cultivation / availability and conservation / wild-harvest queries.
+- Each dimension gets a qualitative rating (`FAVORABLE` / `MODERATE` / `CHALLENGING` / `INSUFFICIENT_EVIDENCE`). **No combined score.** A rating with no valid citations is forced to `INSUFFICIENT_EVIDENCE`.
+- Web search backends (`websearch/`): `mock` (default, fixtures without URLs), `serper` (Google SERP), `google_cse`, `tavily`, `none`. No silent fallback to mock. Web hits become `RetrievedSource(source_type="web")` with a stable `web_<sha1>` id, so the shared verifier can check claims against them.
+
+## Phase 8 — NBA / ABS Calculator (built)
+
+```mermaid
+flowchart TD
+  startNode[START] --> parser[InputParser]
+  parser --> botanical[SharedBotanicalNormalizer_all_ingredients]
+  botanical --> applicability[AbsApplicability]
+  applicability -->|NOT_APPLICABLE| assemble[Assemble]
+  applicability --> rules[RuleRetrieval_RateSelection]
+  rules --> calc[DeterministicPythonCalculation]
+  calc --> assemble
+  assemble --> verifier[SharedCriticVerifier]
+  verifier --> endNode[END]
+```
+
+- The LLM selects the rate plus its `source_id`. Python accepts it only if that exact percentage appears in the cited source text (`grounded=true`); otherwise no fee is computed and the result escalates to `rate_not_grounded_in_source`.
+- `fee = turnover * percentage / 100` uses `Decimal`, rounded half-up to paise (`graph/nba_abs/calculator.py`).
+- `percentage_override` is accepted and labeled `percentage_origin="user_override"`.
+- Mock ABS rates are **test fixtures** modelled on the 2014 ABS Guidelines. Ingest the currently notified regulations as `source_type="regulation"` before real use.
 
 ---
 
@@ -54,8 +101,8 @@ flowchart LR
 | Workflow | Graph | Endpoint | This tranche |
 |----------|--------|----------|----------------|
 | Section 3 & Patent Advisor | `graph/patent_advisor_graph.py` | `POST /api/v1/patent-advisor` | **Yes** |
-| Product Review | `graph/product_review_graph.py` | `POST /api/v1/product-review` | Later |
-| NBA / ABS | `graph/nba_abs_graph.py` | `POST /api/v1/nba-abs` | Later |
+| Product Review | `graph/product_review_graph.py` | `POST /api/v1/product-review` | **Done (Phase 7)** |
+| NBA / ABS | `graph/nba_abs_graph.py` | `POST /api/v1/nba-abs` | **Done (Phase 8)** |
 
 ---
 

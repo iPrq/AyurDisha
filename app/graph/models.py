@@ -250,3 +250,221 @@ class PatentAdvisorResponse(BaseModel):
         "AyurDisha provides decision support only and is not legal advice. "
         "Unsupported claims are rejected or escalated; never invent statutes or foreign law."
     )
+
+
+# ---------------------------------------------------------------------------
+# Product Review (Feature 1)
+# ---------------------------------------------------------------------------
+
+
+class DimensionRating(str, Enum):
+    """Qualitative per-dimension rating — never collapsed into one combined score."""
+
+    FAVORABLE = "FAVORABLE"
+    MODERATE = "MODERATE"
+    CHALLENGING = "CHALLENGING"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+
+
+class ReviewFinding(BaseModel):
+    summary: str
+    evidence_source_ids: list[str] = Field(default_factory=list)
+    evidence_kind: EvidenceKind = EvidenceKind.FACT_FROM_SOURCE
+
+
+class CompetitorProduct(BaseModel):
+    name: str
+    company: str | None = None
+    notes: str | None = None
+    evidence_source_ids: list[str] = Field(default_factory=list)
+
+
+class MarketFeasibilityAssessment(BaseModel):
+    rating: DimensionRating = DimensionRating.INSUFFICIENT_EVIDENCE
+    summary: str = ""
+    target_category: str | None = None
+    target_market: str | None = None
+    competitors: list[CompetitorProduct] = Field(default_factory=list)
+    demand_indicators: list[ReviewFinding] = Field(default_factory=list)
+    findings: list[ReviewFinding] = Field(default_factory=list)
+    insufficient_evidence: bool = False
+
+
+class LegalComplianceAssessment(BaseModel):
+    rating: DimensionRating = DimensionRating.INSUFFICIENT_EVIDENCE
+    summary: str = ""
+    regulatory_category: str | None = Field(
+        default=None,
+        description="e.g. Ayurvedic proprietary medicine, health supplement (food)",
+    )
+    requirements: list[ReviewFinding] = Field(default_factory=list)
+    restrictions: list[ReviewFinding] = Field(default_factory=list)
+    insufficient_evidence: bool = False
+    legal_scope: LegalScope = LegalScope.DOMESTIC
+
+
+class ResourceAvailability(BaseModel):
+    ingredient: str
+    botanical_name: str | None = None
+    availability: str = ""
+    cultivation: str = ""
+    sustainability_concerns: str = ""
+    evidence_source_ids: list[str] = Field(default_factory=list)
+
+
+class ResourceAccessibilityAssessment(BaseModel):
+    rating: DimensionRating = DimensionRating.INSUFFICIENT_EVIDENCE
+    summary: str = ""
+    resources: list[ResourceAvailability] = Field(default_factory=list)
+    findings: list[ReviewFinding] = Field(default_factory=list)
+    insufficient_evidence: bool = False
+
+
+class ProductReviewRequest(BaseModel):
+    product: str
+    ingredients: list[str] = Field(default_factory=list)
+    language: str = "en"
+    jurisdiction: str = "india"
+    legal_scope: LegalScope = LegalScope.DOMESTIC
+    target_market: str | None = Field(
+        default=None, description="Defaults to the jurisdiction when omitted"
+    )
+    product_category: str | None = Field(
+        default=None,
+        description="Optional hint, e.g. 'Ayurvedic proprietary medicine' or 'health supplement'",
+    )
+    user_query: str | None = None
+
+
+class ProductReviewResponse(BaseModel):
+    product: str
+    ingredients: list[str]
+    language: str
+    jurisdiction: str
+    legal_scope: LegalScope
+    target_market: str | None = None
+    botanicals: list[BotanicalResult] = Field(default_factory=list)
+    market_feasibility: MarketFeasibilityAssessment | None = None
+    legal_compliance: LegalComplianceAssessment | None = None
+    resource_accessibility: ResourceAccessibilityAssessment | None = None
+    combined_summary: str | None = None
+    verification: VerificationResult | None = None
+    retrieved_sources: list[RetrievedSource] = Field(default_factory=list)
+    final_answer: str | None = None
+    disclaimer: str = (
+        "AyurDisha provides decision support only and is not legal, regulatory, or "
+        "investment advice. Market and resource evidence comes from retrieved/web "
+        "sources and may be incomplete; unsupported claims are rejected or escalated."
+    )
+
+
+# ---------------------------------------------------------------------------
+# NBA / ABS Calculator (Feature 3)
+# ---------------------------------------------------------------------------
+
+
+class AbsPurpose(str, Enum):
+    COMMERCIAL_UTILIZATION = "commercial_utilization"
+    RESEARCH = "research"
+    BIO_SURVEY = "bio_survey"
+    IPR = "ipr"
+
+
+class EntityType(str, Enum):
+    INDIAN = "indian"
+    FOREIGN = "foreign"
+
+
+class ResourceSource(str, Enum):
+    WILD = "wild"
+    CULTIVATED = "cultivated"
+    UNKNOWN = "unknown"
+
+
+class AbsApplicabilityStatus(str, Enum):
+    APPLICABLE = "APPLICABLE"
+    NOT_APPLICABLE = "NOT_APPLICABLE"
+    UNCERTAIN = "UNCERTAIN"
+
+
+class AbsApplicability(BaseModel):
+    status: AbsApplicabilityStatus = AbsApplicabilityStatus.UNCERTAIN
+    authority: str | None = Field(
+        default=None, description="e.g. NBA or State Biodiversity Board — from sources only"
+    )
+    summary: str = ""
+    reasons: list[ReviewFinding] = Field(default_factory=list)
+    exemptions_considered: list[ReviewFinding] = Field(default_factory=list)
+    insufficient_evidence: bool = False
+
+
+class AbsRateSelection(BaseModel):
+    """LLM-selected rate; Python checks it appears verbatim in the cited source."""
+
+    percentage: float | None = Field(default=None, ge=0.0, le=100.0)
+    basis: str | None = Field(
+        default=None, description="e.g. annual gross ex-factory sale price"
+    )
+    tier_description: str | None = None
+    source_id: str | None = None
+    quoted_text: str | None = None
+    rationale: str = ""
+    grounded: bool = Field(
+        default=False,
+        description="Set by Python: percentage found in cited source text",
+    )
+    insufficient_evidence: bool = False
+
+
+class AbsFeeCalculation(BaseModel):
+    annual_turnover_inr: float
+    percentage: float
+    fee_inr: float
+    formula: str = "fee = turnover * percentage / 100"
+    percentage_origin: Literal["source", "user_override"] = "source"
+    source_id: str | None = None
+    evidence_kind: EvidenceKind = EvidenceKind.CALCULATION
+
+
+class NbaAbsRequest(BaseModel):
+    product: str
+    ingredients: list[str] = Field(default_factory=list)
+    annual_turnover_inr: float | None = Field(
+        default=None,
+        ge=0.0,
+        description="Annual gross ex-factory sale (INR) of the product using the resource",
+    )
+    purpose: AbsPurpose = AbsPurpose.COMMERCIAL_UTILIZATION
+    entity_type: EntityType = EntityType.INDIAN
+    resource_source: ResourceSource = ResourceSource.UNKNOWN
+    percentage_override: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=100.0,
+        description="User-supplied rate; bypasses source rate selection and is labeled as such",
+    )
+    language: str = "en"
+    jurisdiction: str = "india"
+    user_query: str | None = None
+
+
+class NbaAbsResponse(BaseModel):
+    product: str
+    ingredients: list[str]
+    jurisdiction: str
+    purpose: AbsPurpose
+    entity_type: EntityType
+    resource_source: ResourceSource
+    annual_turnover_inr: float | None = None
+    botanicals: list[BotanicalResult] = Field(default_factory=list)
+    applicability: AbsApplicability | None = None
+    rate_selection: AbsRateSelection | None = None
+    calculation: AbsFeeCalculation | None = None
+    verification: VerificationResult | None = None
+    retrieved_sources: list[RetrievedSource] = Field(default_factory=list)
+    final_answer: str | None = None
+    disclaimer: str = (
+        "AyurDisha provides decision support only and is not legal advice. "
+        "Fee arithmetic is deterministic; the applicable rate must be confirmed "
+        "against the currently notified ABS regulations and the competent authority."
+    )

@@ -194,7 +194,7 @@ def chunk_document(doc: RawDocument) -> list[CanonicalChunk]:
     st = doc.meta.source_type
     if st == "statute":
         return chunk_statute(doc)
-    if st in ("guideline", "comparative_ip"):
+    if st in ("guideline", "comparative_ip", "regulation"):
         return chunk_guideline(doc)
     if st == "patent":
         out: list[CanonicalChunk] = []

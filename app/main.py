@@ -1,4 +1,4 @@
-"""AyurDisha FastAPI application — Patent Advisor first."""
+"""AyurDisha FastAPI application — Product Review, Patent Advisor, NBA / ABS."""
 
 from __future__ import annotations
 
@@ -7,8 +7,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from api.nba_abs import get_graph as get_nba_abs_graph
+from api.nba_abs import router as nba_abs_router
 from api.patent_advisor import get_graph
 from api.patent_advisor import router as patent_advisor_router
+from api.product_review import get_graph as get_product_review_graph
+from api.product_review import router as product_review_router
 from config import get_settings
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -17,22 +21,29 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     # Non-mock backends are built eagerly so misconfiguration fails at startup.
-    if get_settings().retriever_backend != "mock":
+    settings = get_settings()
+    if settings.retriever_backend != "mock":
         get_graph()
+        get_nba_abs_graph()
+    if settings.retriever_backend != "mock" or settings.web_search_backend != "mock":
+        get_product_review_graph()
     yield
 
 
 app = FastAPI(
     title="AyurDisha",
     description=(
-        "Decision-support backend for Ayurvedic IP guidance. "
-        "Not legal advice. Unsupported claims are rejected or escalated."
+        "Decision-support backend for Ayurvedic product review, IP guidance, and "
+        "NBA / ABS benefit-sharing. Not legal advice. "
+        "Unsupported claims are rejected or escalated."
     ),
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
+app.include_router(product_review_router)
 app.include_router(patent_advisor_router)
+app.include_router(nba_abs_router)
 
 
 @app.get("/health")

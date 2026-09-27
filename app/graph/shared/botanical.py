@@ -173,6 +173,43 @@ def botanical_normalizer_node(
     return update
 
 
+def resolve_ingredient_terms(state: dict[str, Any]) -> list[str]:
+    terms = [i.strip() for i in (state.get("ingredients") or []) if i and i.strip()]
+    if terms:
+        return list(dict.fromkeys(terms))
+    fallback = (state.get("botanical_input") or state.get("product") or "").strip()
+    return [fallback] if fallback else []
+
+
+def multi_botanical_normalizer_node(
+    state: dict[str, Any],
+    *,
+    kg: BotanicalKnowledgeGraph | None = None,
+    settings: Settings | None = None,
+    llm: Any | None = None,
+) -> dict[str, Any]:
+    """Normalize every ingredient (Product Review / NBA-ABS need all resources)."""
+    results = [
+        normalize_botanical(term, kg=kg, settings=settings, llm=llm)
+        for term in resolve_ingredient_terms(state)
+    ]
+    update: dict[str, Any] = {"botanicals": results}
+    if not results:
+        update["botanical_status"] = BotanicalStatus.UNRESOLVED.value
+        return update
+
+    primary = results[0]
+    update["botanical"] = primary
+    update["botanical_status"] = primary.status.value
+    if primary.botanical_name:
+        update["botanical_name"] = primary.botanical_name
+
+    if any(r.status == BotanicalStatus.AMBIGUOUS for r in results):
+        update["escalation_reasons"] = ["ambiguous_botanical"]
+        update["verification_status"] = "HUMAN_REVIEW_REQUIRED"
+    return update
+
+
 def make_botanical_normalizer_node(
     *,
     kg: BotanicalKnowledgeGraph | None = None,

@@ -60,10 +60,29 @@ class Settings(BaseModel):
     bm25_candidates: int = Field(default=30)
     rerank_candidates: int = Field(default=20)
 
+    # Web search (Product Review evidence): mock | serper | google_cse | tavily | none
+    web_search_backend: str = Field(default="mock")
+    serper_api_key: str | None = Field(default=None)
+    google_cse_api_key: str | None = Field(default=None)
+    google_cse_id: str | None = Field(default=None)
+    tavily_api_key: str | None = Field(default=None)
+    web_search_results: int = Field(default=5)
+    web_search_timeout: float = Field(default=15.0)
+    web_search_country: str = Field(default="in")
+
+    # Product Review: cap on ingredients searched for resource accessibility
+    product_review_max_resources: int = Field(default=3)
+
     def redacted(self) -> dict[str, object]:
         """Settings dump safe for logs (secrets masked)."""
         data = self.model_dump()
-        for key in ("nvidia_api_key", "qdrant_api_key"):
+        for key in (
+            "nvidia_api_key",
+            "qdrant_api_key",
+            "serper_api_key",
+            "google_cse_api_key",
+            "tavily_api_key",
+        ):
             data[key] = "***" if data.get(key) else None
         return data
 
@@ -139,4 +158,13 @@ def get_settings() -> Settings:
         dense_candidates=_env_int("DENSE_CANDIDATES", 30),
         bm25_candidates=_env_int("BM25_CANDIDATES", 30),
         rerank_candidates=_env_int("RERANK_CANDIDATES", 20),
+        web_search_backend=(_env_str("WEB_SEARCH_BACKEND", "mock") or "mock").lower(),
+        serper_api_key=_env_str("SERPER_API_KEY"),
+        google_cse_api_key=_env_str("GOOGLE_CSE_API_KEY"),
+        google_cse_id=_env_str("GOOGLE_CSE_ID"),
+        tavily_api_key=_env_str("TAVILY_API_KEY"),
+        web_search_results=_env_int("WEB_SEARCH_RESULTS", 5),
+        web_search_timeout=_env_float("WEB_SEARCH_TIMEOUT", 15.0),
+        web_search_country=(_env_str("WEB_SEARCH_COUNTRY", "in") or "in").lower(),
+        product_review_max_resources=_env_int("PRODUCT_REVIEW_MAX_RESOURCES", 3),
     )

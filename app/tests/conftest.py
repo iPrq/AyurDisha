@@ -30,11 +30,110 @@ from graph.models import (  # noqa: E402
 )
 
 
+def _prompt_source_ids(user: str) -> list[str]:
+    import re
+
+    return re.findall(r"^source_id=(\S+)$", user, flags=re.MULTILINE)
+
+
+def _scripted_new_features(name: str, user: str) -> Any | None:
+    """Product Review / NBA-ABS responses that cite ids actually present in the prompt."""
+    from graph.models import (
+        AbsApplicability,
+        AbsApplicabilityStatus,
+        AbsRateSelection,
+        CompetitorProduct,
+        DimensionRating,
+        LegalComplianceAssessment,
+        MarketFeasibilityAssessment,
+        ResourceAccessibilityAssessment,
+        ResourceAvailability,
+        ReviewFinding,
+    )
+
+    ids = _prompt_source_ids(user)
+    first = ids[:1]
+
+    if name == "MarketFeasibilityAssessment":
+        return MarketFeasibilityAssessment(
+            rating=DimensionRating.MODERATE,
+            summary="Existing single-herb products indicate an established category.",
+            target_category="Ayurvedic capsules",
+            competitors=[
+                CompetitorProduct(name="Listed competitor", evidence_source_ids=first),
+                CompetitorProduct(name="Uncited brand", evidence_source_ids=[]),
+            ],
+            findings=[
+                ReviewFinding(summary="Products sold via pharmacies.", evidence_source_ids=first)
+            ],
+        )
+    if name == "LegalComplianceAssessment":
+        scope = (
+            LegalScope.INTERNATIONAL
+            if "legal_scope=international" in user
+            else LegalScope.DOMESTIC
+        )
+        return LegalComplianceAssessment(
+            rating=DimensionRating.MODERATE,
+            summary="Manufacturing licence and GMP requirements apply.",
+            regulatory_category="Ayurvedic proprietary medicine",
+            requirements=[
+                ReviewFinding(summary="State manufacturing licence.", evidence_source_ids=first)
+            ],
+            legal_scope=scope,
+        )
+    if name == "ResourceAccessibilityAssessment":
+        return ResourceAccessibilityAssessment(
+            rating=DimensionRating.FAVORABLE,
+            summary="Plant is reported as cultivated.",
+            resources=[
+                ResourceAvailability(
+                    ingredient="Ashwagandha",
+                    botanical_name="Withania somnifera",
+                    cultivation="Cultivated in several states.",
+                    evidence_source_ids=first,
+                )
+            ],
+        )
+    if name == "AbsApplicability":
+        cite = ["fixture-in-abs-bd-act"] if "fixture-in-abs-bd-act" in ids else first
+        return AbsApplicability(
+            status=AbsApplicabilityStatus.APPLICABLE,
+            authority="State Biodiversity Board",
+            summary="Commercial utilization by an Indian entity requires prior intimation.",
+            reasons=[ReviewFinding(summary="Prior intimation to SBB.", evidence_source_ids=cite)],
+        )
+    if name == "AbsRateSelection":
+        return AbsRateSelection(
+            percentage=0.2,
+            basis="annual gross ex-factory sale",
+            tier_description="above Rs 1 crore and up to Rs 3 crore",
+            source_id="fixture-in-abs-rates" if "fixture-in-abs-rates" in ids else None,
+            quoted_text="above Rs 1 crore and up to Rs 3 crore: 0.2 per cent",
+            rationale="Turnover falls in the Rs 1-3 crore slab.",
+        )
+    return None
+
+
 class ScriptedLLM:
-    """Callable stand-in: (schema, system, user) -> Pydantic model."""
+    """Callable stand-in: (schema, system, user) -> Pydantic model.
+
+    ``overrides`` maps schema name -> model instance (or callable(user) -> model).
+    """
+
+    def __init__(self, overrides: dict[str, Any] | None = None) -> None:
+        self.overrides = dict(overrides or {})
+        self.calls: list[str] = []
 
     def __call__(self, schema: type, system: str, user: str) -> Any:
         name = schema.__name__
+        self.calls.append(name)
+        if name in self.overrides:
+            value = self.overrides[name]
+            return value(user) if callable(value) else value
+        scripted = _scripted_new_features(name, user)
+        if scripted is not None:
+            return scripted
         if name == "Section3Results":
             if "legal_scope=international" in user or "legal_scope=international" in system:
                 return Section3Results(

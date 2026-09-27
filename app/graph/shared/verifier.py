@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Callable
 
 from config import Settings, get_settings
 from graph.models import (
@@ -18,6 +18,23 @@ from graph.prompts import VERIFIER_SYSTEM
 from graph.state import PatentAdvisorState
 from llm.provider import get_chat_model
 from llm.structured import format_sources_for_prompt, structured_invoke
+
+
+def dedupe_claims(claims: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for c in claims:
+        key = c.strip()
+        if key and key not in seen:
+            seen.add(key)
+            unique.append(key)
+    return unique
+
+
+def draft_sentences(draft: Any) -> list[str]:
+    if not isinstance(draft, str) or not draft.strip():
+        return []
+    return [p.strip() for p in re.split(r"(?<=[.!?])\s+", draft.strip()) if p.strip()]
 
 
 def collect_claims_from_state(state: PatentAdvisorState) -> list[str]:
@@ -56,20 +73,8 @@ def collect_claims_from_state(state: PatentAdvisorState) -> list[str]:
                 )
                 claims.append(f"{route}: {suggestion.rationale}")
 
-    draft = state.get("final_answer")
-    if isinstance(draft, str) and draft.strip():
-        for part in re.split(r"(?<=[.!?])\s+", draft.strip()):
-            if part.strip():
-                claims.append(part.strip())
-
-    seen: set[str] = set()
-    unique: list[str] = []
-    for c in claims:
-        key = c.strip()
-        if key and key not in seen:
-            seen.add(key)
-            unique.append(key)
-    return unique
+    claims.extend(draft_sentences(state.get("final_answer")))
+    return dedupe_claims(claims)
 
 
 def verify_claims(
@@ -197,9 +202,11 @@ def critic_verifier_node(
     *,
     settings: Settings | None = None,
     llm: Any | None = None,
+    claims_collector: Callable[[Any], list[str]] = collect_claims_from_state,
+    human_review_reasons: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
     sources = list(state.get("retrieved_sources") or [])
-    claims = collect_claims_from_state(state)
+    claims = claims_collector(state)
     prior_reasons = list(state.get("escalation_reasons") or [])
 
     botanical = state.get("botanical")
@@ -226,6 +233,10 @@ def critic_verifier_node(
         settings=settings,
         llm=llm,
     )
+    if result.outcome == VerificationOutcome.PASS and human_review_reasons.intersection(
+        result.escalation_reasons
+    ):
+        result.outcome = VerificationOutcome.HUMAN_REVIEW_REQUIRED
 
     draft = state.get("final_answer") or ""
     cleaned = strip_unsupported_from_text(draft, result.stripped_unsupported_claims)

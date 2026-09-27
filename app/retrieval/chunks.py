@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from graph.models import LegalScope, RetrievedSource
 
-SOURCE_TYPES = ("statute", "guideline", "patent", "comparative_ip")
+SOURCE_TYPES = ("statute", "guideline", "patent", "comparative_ip", "regulation")
 
 
 class CanonicalChunk(BaseModel):

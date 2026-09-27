@@ -40,6 +40,7 @@ def format_sources_for_prompt(sources: list[RetrievedSource]) -> str:
                     f"jurisdiction={s.jurisdiction or ''}",
                     f"legal_scope={s.legal_scope.value if hasattr(s.legal_scope, 'value') else s.legal_scope}",
                     f"source_type={s.source_type}",
+                    f"source_url={s.source_url or ''}",
                     f"text={s.text}",
                 ]
             )

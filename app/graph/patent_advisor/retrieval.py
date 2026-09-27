@@ -9,6 +9,16 @@ from graph.state import PatentAdvisorState
 from retrieval.base import LegalRetriever
 from retrieval.mock import get_mock_retriever
 
+# Keeps product-regulation / ABS chunks out of patent reasoning.
+PATENT_SOURCE_TYPES = [
+    "statute",
+    "guideline",
+    "patent",
+    "comparative_ip",
+    "prior_art",
+    "guidance",
+]
+
 
 def _build_query(state: PatentAdvisorState) -> str:
     parts: list[str] = []
@@ -41,6 +51,7 @@ def legal_patent_retrieval_node(
         query,
         jurisdiction=jurisdiction,
         legal_scope=legal_scope,
+        source_types=PATENT_SOURCE_TYPES,
     )
 
     update: dict[str, Any] = {

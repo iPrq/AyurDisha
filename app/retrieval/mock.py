@@ -127,6 +127,137 @@ _FIXTURES: list[RetrievedSource] = [
         legal_scope=LegalScope.INTERNATIONAL,
         is_fixture=True,
     ),
+    # --- Product regulation (Product Review legal compliance) ---
+    RetrievedSource(
+        id="fixture-in-reg-dca-asu",
+        title="[TEST FIXTURE] Drugs and Cosmetics Act — Ayurvedic drug licensing",
+        text=(
+            "[TEST FIXTURE — NOT OFFICIAL TEXT] Ayurvedic, Siddha and Unani drugs are "
+            "regulated under the Drugs and Cosmetics Act, 1940 and the Drugs Rules, 1945. "
+            "Manufacture for sale requires a licence from the State Licensing Authority. "
+            "Ayurvedic proprietary medicines require evidence of safety and effectiveness "
+            "for licensing (Rule 158B)."
+        ),
+        section="Rule 158B",
+        source_type="regulation_fixture",
+        source_url=None,
+        effective_date="fixture",
+        retrieval_score=0.88,
+        jurisdiction="india",
+        legal_scope=LegalScope.DOMESTIC,
+        is_fixture=True,
+    ),
+    RetrievedSource(
+        id="fixture-in-reg-gmp",
+        title="[TEST FIXTURE] Schedule T — GMP for ASU manufacturing",
+        text=(
+            "[TEST FIXTURE — NOT OFFICIAL TEXT] Schedule T to the Drugs Rules prescribes "
+            "Good Manufacturing Practices for Ayurvedic, Siddha and Unani manufacturing "
+            "units, including premises, raw material testing and record keeping."
+        ),
+        section="Schedule T",
+        source_type="regulation_fixture",
+        source_url=None,
+        effective_date="fixture",
+        retrieval_score=0.82,
+        jurisdiction="india",
+        legal_scope=LegalScope.DOMESTIC,
+        is_fixture=True,
+    ),
+    RetrievedSource(
+        id="fixture-in-reg-fssai",
+        title="[TEST FIXTURE] FSSAI — botanical health supplements and Ayurveda Aahara",
+        text=(
+            "[TEST FIXTURE — NOT OFFICIAL TEXT] Botanical products marketed as foods may "
+            "fall under the Food Safety and Standards (Health Supplements, Nutraceuticals "
+            "...) Regulations, 2016 or the Food Safety and Standards (Ayurveda Aahara) "
+            "Regulations, 2022, rather than drug licensing."
+        ),
+        section=None,
+        source_type="regulation_fixture",
+        source_url=None,
+        effective_date="fixture",
+        retrieval_score=0.80,
+        jurisdiction="india",
+        legal_scope=LegalScope.DOMESTIC,
+        is_fixture=True,
+    ),
+    RetrievedSource(
+        id="fixture-in-reg-dmr",
+        title="[TEST FIXTURE] Drugs and Magic Remedies Act — advertising claims",
+        text=(
+            "[TEST FIXTURE — NOT OFFICIAL TEXT] The Drugs and Magic Remedies "
+            "(Objectionable Advertisements) Act, 1954 restricts advertisements claiming "
+            "to treat listed diseases and conditions."
+        ),
+        section=None,
+        source_type="regulation_fixture",
+        source_url=None,
+        effective_date="fixture",
+        retrieval_score=0.78,
+        jurisdiction="india",
+        legal_scope=LegalScope.DOMESTIC,
+        is_fixture=True,
+    ),
+    RetrievedSource(
+        id="fixture-intl-reg-thmp",
+        title="[TEST FIXTURE] Comparative regulation — traditional herbal medicinal products",
+        text=(
+            "[TEST FIXTURE — NOT OFFICIAL TEXT] Some foreign markets offer a simplified "
+            "registration route for traditional herbal medicinal products based on "
+            "evidence of long-standing use. Cite only retrieved comparative sources."
+        ),
+        section=None,
+        source_type="regulation_fixture",
+        source_url=None,
+        effective_date="fixture",
+        retrieval_score=0.76,
+        jurisdiction="eu",
+        legal_scope=LegalScope.INTERNATIONAL,
+        is_fixture=True,
+    ),
+    # --- Access & Benefit Sharing (NBA / ABS) ---
+    RetrievedSource(
+        id="fixture-in-abs-bd-act",
+        title="[TEST FIXTURE] Biological Diversity Act — access and approvals",
+        text=(
+            "[TEST FIXTURE — NOT OFFICIAL TEXT] Under the Biological Diversity Act, 2002 "
+            "(as amended in 2023), foreign entities require prior approval of the "
+            "National Biodiversity Authority (NBA) to obtain biological resources "
+            "occurring in India for research or commercial utilization. Indian entities "
+            "give prior intimation to the State Biodiversity Board (SBB) for commercial "
+            "utilization. Codified traditional knowledge and cultivated medicinal plants "
+            "(other than those notified) are exempted from certain provisions."
+        ),
+        section=None,
+        source_type="regulation_fixture",
+        source_url=None,
+        effective_date="fixture",
+        retrieval_score=0.87,
+        jurisdiction="india",
+        legal_scope=LegalScope.DOMESTIC,
+        is_fixture=True,
+    ),
+    RetrievedSource(
+        id="fixture-in-abs-rates",
+        title="[TEST FIXTURE] ABS benefit-sharing rates on commercial utilization",
+        text=(
+            "[TEST FIXTURE — NOT OFFICIAL TEXT; modelled on the 2014 ABS Guidelines, "
+            "which may be superseded — verify against currently notified regulations] "
+            "Where biological resources are accessed for commercial utilization, benefit "
+            "sharing is payable on the annual gross ex-factory sale of the product: "
+            "up to Rs 1 crore: 0.1 per cent; above Rs 1 crore and up to Rs 3 crore: "
+            "0.2 per cent; above Rs 3 crore: 0.5 per cent."
+        ),
+        section=None,
+        source_type="regulation_fixture",
+        source_url=None,
+        effective_date="fixture",
+        retrieval_score=0.86,
+        jurisdiction="india",
+        legal_scope=LegalScope.DOMESTIC,
+        is_fixture=True,
+    ),
 ]
 
 
