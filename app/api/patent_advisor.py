@@ -6,8 +6,11 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
+from config import get_settings
 from graph.models import LegalScope, PatentAdvisorRequest, PatentAdvisorResponse
 from graph.patent_advisor_graph import build_patent_advisor_graph
+from knowledge_graph.factory import get_knowledge_graph
+from retrieval.factory import get_retriever
 
 router = APIRouter(prefix="/api/v1", tags=["patent-advisor"])
 
@@ -17,7 +20,12 @@ _graph = None
 def get_graph():
     global _graph
     if _graph is None:
-        _graph = build_patent_advisor_graph()
+        settings = get_settings()
+        _graph = build_patent_advisor_graph(
+            retriever=get_retriever(settings),
+            kg=get_knowledge_graph(settings),
+            settings=settings,
+        )
     return _graph
 
 

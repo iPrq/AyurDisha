@@ -1,0 +1,10 @@
+{
+  "doc_id": "fixture_patents_act",
+  "title": "[TEST FIXTURE] Patents Act excerpt",
+  "source_type": "statute",
+  "source_url": null,
+  "effective_date": "fixture",
+  "jurisdiction": "india",
+  "legal_scope": "domestic",
+  "is_fixture": true
+}

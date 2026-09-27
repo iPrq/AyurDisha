@@ -154,12 +154,22 @@ class MockLegalRetriever:
         jurisdiction: str = "india",
         legal_scope: LegalScope | str = LegalScope.DOMESTIC,
         top_k: int = 8,
+        source_types: list[str] | None = None,
     ) -> list[RetrievedSource]:
         filtered = filter_sources(
             self._corpus,
             jurisdiction=jurisdiction,
             legal_scope=legal_scope,
         )
+        if source_types:
+            # Fixture types carry a suffix, e.g. "statute_fixture" matches "statute".
+            wanted = {t.strip().lower() for t in source_types}
+            filtered = [
+                s
+                for s in filtered
+                if s.source_type.lower() in wanted
+                or s.source_type.lower().removesuffix("_fixture") in wanted
+            ]
         ranked = sorted(
             filtered,
             key=lambda s: _score_query(s, query or ""),

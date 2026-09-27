@@ -62,7 +62,10 @@ def filter_sources(
 
 @runtime_checkable
 class LegalRetriever(Protocol):
-    """Retrieve legal / patent sources. Real Qdrant/BM25 hybrid comes later."""
+    """Retrieve legal / patent sources (mock fixtures or Qdrant + BM25 hybrid).
+
+    ``source_types`` optionally restricts results (e.g. ["statute", "guideline"]).
+    """
 
     def retrieve(
         self,
@@ -71,5 +74,6 @@ class LegalRetriever(Protocol):
         jurisdiction: str = "india",
         legal_scope: LegalScope | str = LegalScope.DOMESTIC,
         top_k: int = 8,
+        source_types: list[str] | None = None,
     ) -> list[RetrievedSource]:
         ...

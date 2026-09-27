@@ -10,6 +10,9 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 
+DEFAULT_EMBEDDING_MODEL = "nvidia/nemotron-3-embed-1b"
+DEFAULT_RERANK_MODEL = "nvidia/llama-nemotron-rerank-vl-1b-v2"
+
 
 class Settings(BaseModel):
     """Shared runtime configuration (LLM, scoring weights, thresholds)."""
@@ -34,6 +37,49 @@ class Settings(BaseModel):
     botanical_confidence_threshold: float = Field(default=0.7)
     verification_min_support_ratio: float = Field(default=0.6)
     max_verifier_retries: int = Field(default=1)
+
+    # Retrieval backend (mock by default; qdrant = Qdrant dense + BM25 hybrid)
+    retriever_backend: str = Field(default="mock")
+    qdrant_mode: str = Field(default="local")
+    qdrant_path: str = Field(default="./qdrant_data")
+    qdrant_url: str | None = Field(default=None)
+    qdrant_api_key: str | None = Field(default=None)
+    qdrant_collection: str = Field(default="ayurdisha_legal")
+
+    # nv-embedqa-e5-v5 / nv-rerankqa-mistral-4b-v3 were retired by NVIDIA (410/404).
+    embedding_model: str = Field(default=DEFAULT_EMBEDDING_MODEL)
+    rerank_model: str = Field(default=DEFAULT_RERANK_MODEL)
+    reranker_enabled: bool = Field(default=False)
+
+    # BM25: "qdrant" rebuilds from collection payloads; "file" loads bm25_dir
+    bm25_source: str = Field(default="qdrant")
+    bm25_dir: str = Field(default="./data/processed")
+
+    rrf_k: int = Field(default=60)
+    dense_candidates: int = Field(default=30)
+    bm25_candidates: int = Field(default=30)
+    rerank_candidates: int = Field(default=20)
+
+    def redacted(self) -> dict[str, object]:
+        """Settings dump safe for logs (secrets masked)."""
+        data = self.model_dump()
+        for key in ("nvidia_api_key", "qdrant_api_key"):
+            data[key] = "***" if data.get(key) else None
+        return data
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_str(name: str, default: str | None = None) -> str | None:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip()
 
 
 def _env_float(name: str, default: float) -> float:
@@ -76,4 +122,21 @@ def get_settings() -> Settings:
             "VERIFICATION_MIN_SUPPORT_RATIO", 0.6
         ),
         max_verifier_retries=_env_int("MAX_VERIFIER_RETRIES", 1),
+        retriever_backend=(_env_str("RETRIEVER_BACKEND", "mock") or "mock").lower(),
+        qdrant_mode=(_env_str("QDRANT_MODE", "local") or "local").lower(),
+        qdrant_path=_env_str("QDRANT_PATH", "./qdrant_data") or "./qdrant_data",
+        qdrant_url=_env_str("QDRANT_URL"),
+        qdrant_api_key=_env_str("QDRANT_API_KEY"),
+        qdrant_collection=_env_str("QDRANT_COLLECTION", "ayurdisha_legal")
+        or "ayurdisha_legal",
+        embedding_model=_env_str("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
+        or DEFAULT_EMBEDDING_MODEL,
+        rerank_model=_env_str("RERANK_MODEL", DEFAULT_RERANK_MODEL) or DEFAULT_RERANK_MODEL,
+        reranker_enabled=_env_bool("RERANKER_ENABLED", False),
+        bm25_source=(_env_str("BM25_SOURCE", "qdrant") or "qdrant").lower(),
+        bm25_dir=_env_str("BM25_DIR", "./data/processed") or "./data/processed",
+        rrf_k=_env_int("RRF_K", 60),
+        dense_candidates=_env_int("DENSE_CANDIDATES", 30),
+        bm25_candidates=_env_int("BM25_CANDIDATES", 30),
+        rerank_candidates=_env_int("RERANK_CANDIDATES", 20),
     )

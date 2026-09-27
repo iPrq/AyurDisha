@@ -11,3 +11,10 @@ wheels/
 
 # Local env
 .env
+
+# Local Qdrant storage (never commit vector DB files)
+qdrant_data/
+
+# Generated retrieval artifacts (rebuild with: uv run python -m ingest.build_index)
+data/processed/*
+!data/processed/.gitkeep

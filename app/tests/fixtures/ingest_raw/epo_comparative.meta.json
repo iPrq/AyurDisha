@@ -1,0 +1,10 @@
+{
+  "doc_id": "fixture_epo_comparative",
+  "title": "[TEST FIXTURE] Comparative IP note (EPO-style)",
+  "source_type": "comparative_ip",
+  "source_url": null,
+  "effective_date": "fixture",
+  "jurisdiction": "epo",
+  "legal_scope": "international",
+  "is_fixture": true
+}

@@ -6,3 +6,8 @@ langchain-core
 pydantic 
 python-dotenv 
 langchain-google-genai
+langchain-nvidia-ai-endpoints
+qdrant-client
+rank-bm25
+pypdf
+beautifulsoup4

@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "beautifulsoup4>=4.15.0",
     "fastapi>=0.141.1",
     "httpx>=0.28.1",
     "langchain>=1.4.2",
@@ -14,8 +15,16 @@ dependencies = [
     "langchain-openai>=1.6.5",
     "langgraph>=1.2.12",
     "pydantic>=2.13.5",
+    "pypdf>=6.19.0",
     "python-dotenv>=1.2.3",
+    "qdrant-client>=1.19.1",
+    "rank-bm25>=0.2.2",
     "uvicorn>=0.53.0",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "cloud: hits real Qdrant Cloud + NVIDIA (opt-in via RUN_CLOUD_TESTS=1)",
 ]
 
 [dependency-groups]

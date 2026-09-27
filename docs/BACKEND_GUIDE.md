@@ -243,10 +243,10 @@ Implemented in `graph/patent_advisor/risk.py` — **Python only**, never asked o
 
 All mock legal texts are labeled **`[TEST FIXTURE — NOT OFFICIAL TEXT]`** and `is_fixture=True`.
 
-| Interface | Mock today | Later |
+| Interface | Mock today | Real |
 |-----------|------------|-------|
-| `BotanicalKnowledgeGraph` | `knowledge_graph/mock.py` | Neo4j |
-| `LegalRetriever` | `retrieval/mock.py` | Qdrant + BM25 hybrid |
+| `BotanicalKnowledgeGraph` | `knowledge_graph/mock.py` | Neo4j (later) |
+| `LegalRetriever` | `retrieval/mock.py` | `retrieval/qdrant_hybrid.py` (Qdrant + BM25), selected with `RETRIEVER_BACKEND=qdrant` — see [RETRIEVAL_GUIDE.md](RETRIEVAL_GUIDE.md) |
 
 To inject fakes in tests:
 
@@ -307,6 +307,13 @@ Working directory / `PYTHONPATH` must include `app/` (uvicorn and pytest `confte
 | `test_section3_risk.py` | Weight math, fixture scoring, intl no-invent |
 | `test_patent_advisor_graph.py` | Full graph domestic / ambiguous / intl / empty intl |
 | `test_patent_advisor_api.py` | `/health`, POST domestic/intl, 422 validation |
+| `test_qdrant_config.py` | Local client, cloud URL/key validation, secret redaction |
+| `test_chunking.py` | Statute clause / guideline / patent chunking, deterministic IDs, sidecars |
+| `test_bm25.py` | BM25 ranking, ID mapping, persistence + rebuild |
+| `test_rrf.py` | RRF math, dedupe, deterministic ties |
+| `test_qdrant_hybrid.py` | End-to-end ingest + hybrid retrieval, scope/source filters, conversion |
+| `test_retriever_factory.py` | mock/qdrant selection, fail-loud config errors, reranker toggle |
+| `test_cloud_smoke.py` | Opt-in (`RUN_CLOUD_TESTS=1`) read-only Qdrant Cloud check |
 
 ---
 
@@ -325,13 +332,10 @@ Append a `RetrievedSource` in `retrieval/mock.py` with:
 - `is_fixture=True`
 - Clear `[TEST FIXTURE]` wording in `text`
 
-### Wire a real retriever later
+### Real retriever (Qdrant + BM25)
 
-Implement `LegalRetriever.retrieve(...)` in e.g. `retrieval/hybrid.py`, then:
-
-```python
-build_patent_advisor_graph(retriever=MyHybridRetriever(...))
-```
+Implemented in `retrieval/qdrant_hybrid.py`; the API picks it via `retrieval/factory.py::get_retriever`
+when `RETRIEVER_BACKEND=qdrant`. Setup, ingestion and AWS deployment: [RETRIEVAL_GUIDE.md](RETRIEVAL_GUIDE.md).
 
 ### Next product features (deferred)
 

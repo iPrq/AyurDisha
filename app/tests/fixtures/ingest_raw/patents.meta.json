@@ -1,0 +1,10 @@
+{
+  "doc_id": "fixture_patents",
+  "title": "[TEST FIXTURE] Patent abstracts",
+  "source_type": "patent",
+  "source_url": null,
+  "effective_date": "fixture",
+  "jurisdiction": "india",
+  "legal_scope": "domestic",
+  "is_fixture": true
+}

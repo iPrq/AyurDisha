@@ -146,3 +146,79 @@ class ScriptedLLM:
 @pytest.fixture
 def scripted_llm() -> ScriptedLLM:
     return ScriptedLLM()
+
+
+# ---------------------------------------------------------------------------
+# Retrieval fixtures — offline (no NVIDIA, no Qdrant Cloud)
+# ---------------------------------------------------------------------------
+
+INGEST_FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "ingest_raw"
+
+
+class FakeEmbeddings:
+    """Deterministic hashed bag-of-words vectors (stands in for NVIDIAEmbeddings)."""
+
+    def __init__(self, dim: int = 64) -> None:
+        self.dim = dim
+        self.query_calls = 0
+        self.document_calls = 0
+
+    def _embed(self, text: str) -> list[float]:
+        import hashlib
+        import math
+
+        from retrieval.bm25_index import tokenize
+
+        vec = [0.0] * self.dim
+        for tok in tokenize(text):
+            h = int(hashlib.md5(tok.encode("utf-8")).hexdigest(), 16)
+            vec[h % self.dim] += 1.0
+        norm = math.sqrt(sum(v * v for v in vec)) or 1.0
+        return [v / norm for v in vec]
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        self.document_calls += 1
+        return [self._embed(t) for t in texts]
+
+    def embed_query(self, text: str) -> list[float]:
+        self.query_calls += 1
+        return self._embed(text)
+
+
+@pytest.fixture
+def fake_embeddings() -> FakeEmbeddings:
+    return FakeEmbeddings()
+
+
+@pytest.fixture
+def ingest_fixture_dir() -> Path:
+    return INGEST_FIXTURE_DIR
+
+
+@pytest.fixture
+def indexed_qdrant(tmp_path, fake_embeddings):
+    """In-memory Qdrant populated from the ingestion fixtures via build_index()."""
+    from qdrant_client import QdrantClient
+
+    from ingest.build_index import build_index
+
+    client = QdrantClient(location=":memory:")
+    processed = tmp_path / "processed"
+    chunks = build_index(
+        client=client,
+        embeddings=fake_embeddings,
+        collection="test_legal",
+        raw_dir=INGEST_FIXTURE_DIR,
+        processed_dir=processed,
+        recreate=True,
+    )
+    try:
+        yield {
+            "client": client,
+            "collection": "test_legal",
+            "chunks": chunks,
+            "processed_dir": processed,
+            "embeddings": fake_embeddings,
+        }
+    finally:
+        client.close()
