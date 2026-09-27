@@ -21,6 +21,7 @@ PDF_SUFFIXES = {".pdf"}
 PATENT_SUFFIXES = {".json", ".jsonl"}
 
 _DOC_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_]*$")
+_LABEL_PREFIX_RE = re.compile(r"^[A-Z][A-Z0-9]{1,9}$")
 
 
 class DocumentMeta(BaseModel):
@@ -37,7 +38,24 @@ class DocumentMeta(BaseModel):
         default=None,
         description="Statutes: section number when the file holds a single section body",
     )
+    section_label_prefix: str | None = Field(
+        default=None,
+        description=(
+            "Statutes other than the Patents Act: short Act code prepended to every "
+            "section label (e.g. 'BDA' -> 'BDA 3(a)') so their sections are never "
+            "confused with Patents Act Section 3 clauses. Leave unset for the Patents Act."
+        ),
+    )
     is_fixture: bool = False
+
+    @field_validator("section_label_prefix")
+    @classmethod
+    def _check_label_prefix(cls, v: str | None) -> str | None:
+        if v is not None and not _LABEL_PREFIX_RE.match(v):
+            raise ValueError(
+                f"section_label_prefix {v!r} must be 2-10 uppercase letters/digits, starting with a letter"
+            )
+        return v
 
     @field_validator("doc_id")
     @classmethod
