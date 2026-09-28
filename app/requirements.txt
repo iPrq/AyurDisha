@@ -11,3 +11,4 @@ qdrant-client
 rank-bm25
 pypdf
 beautifulsoup4
+pytest
