@@ -1,0 +1,12 @@
+{
+  "doc_id": "hf_patents_act_1970_s3",
+  "title": "The Patents Act, 1970 (via HF indian-legal-acts)",
+  "source_type": "statute",
+  "source_url": "https://huggingface.co/datasets/geekyrakshit/indian-legal-acts",
+  "effective_date": null,
+  "jurisdiction": "india",
+  "legal_scope": "domestic",
+  "section_prefix": null,
+  "section_label_prefix": null,
+  "is_fixture": false
+}

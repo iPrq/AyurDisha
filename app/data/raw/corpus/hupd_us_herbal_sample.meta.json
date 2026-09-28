@@ -1,0 +1,12 @@
+{
+  "doc_id": "hupd_us_herbal_sample",
+  "title": "US patent applications - HUPD sample, IPC A61K36 (via HF HUPD/hupd)",
+  "source_type": "patent",
+  "source_url": "https://huggingface.co/datasets/HUPD/hupd",
+  "effective_date": null,
+  "jurisdiction": "us",
+  "legal_scope": "international",
+  "section_prefix": null,
+  "section_label_prefix": null,
+  "is_fixture": false
+}
