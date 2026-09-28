@@ -2,17 +2,56 @@
 
 from __future__ import annotations
 
+import logging
 import re
 
 from ingest.documents import DocumentMeta, PatentRecord, RawDocument
 from retrieval.chunks import CanonicalChunk
 
+logger = logging.getLogger(__name__)
+
 GUIDELINE_MAX_CHARS = 1500
 
-# "3. What are not inventions.—" / "3A. ..." at line start
-_SECTION_RE = re.compile(r"^\s*(\d{1,3}[A-Z]?)\.\s", re.MULTILINE)
-# "(d) the mere discovery ..." at line start
-_CLAUSE_RE = re.compile(r"^\s*\(([a-z])\)\s", re.MULTILINE)
+# Consolidated texts (e.g. India Code) prefix amended provisions with a footnote
+# number and "[", e.g. "6[(d) the mere discovery ..." or "3[33A. Chapter not ...".
+_FN_PREFIX = r"(?:\d+\[)?"
+# "3. What are not inventions.—" / "3A." / "33EE. ..." at line start
+# India Code writes section "33I" as "33-I" to avoid confusion with "331".
+_SECTION_RE = re.compile(
+    rf"^\s*{_FN_PREFIX}(\d{{1,3}}(?:-?[A-Z]{{1,3}})?)\.\s", re.MULTILINE
+)
+# "(d) the mere discovery ..." / "6[(d) ..." at line start
+_CLAUSE_RE = re.compile(rf"^\s*{_FN_PREFIX}\(([a-z])\)\s", re.MULTILINE)
+# Any line-start "(x)" / "(ii)" marker, used to look ahead for nested roman lists
+_ANY_MARKER_RE = re.compile(rf"^\s*{_FN_PREFIX}\(([a-z]{{1,4}})\)\s", re.MULTILINE)
+
+# --- Layout artifacts of PDF-derived consolidated texts (India Code style) ---
+# Page-bottom amendment footnotes: "1. Ins. by Act 15 of 2005, s. 2 (w.e.f. 1-1-2005)."
+_FOOTNOTE_RE = re.compile(
+    r"^\s*\d+\.\s+(?:"
+    r"(?:Ins|Subs|Rep|Omitted|Omit|Added|Renumbered|Inserted|Substituted)\b"
+    r"|(?:The|Certain) words\b|The proviso\b|The Explanation\b"
+    r"|Sub-sections?\b|Sub-clauses?\b|Clauses?\b|Chapter\b"
+    r"|For (?:section|sub-section|clause|the)\b|Came into force\b|See\b|Vide\b"
+    r"|\d{1,2}(?:st|nd|rd|th)\s+\w+,?\s+\d{4}"
+    r"|.*\bw\.e\.f\."
+    r")"
+)
+_PAGE_BREAK_RE = re.compile(r"^\s*(?:\d{1,4}\s+)?-{3,}\s*$")
+_PAGE_NUMBER_RE = re.compile(r"^\s*\d{1,4}\s*$")
+_RULE_LINE_RE = re.compile(r"^\s*_{3,}\s*$")
+# Omitted provision left as a marker, e.g. "1*     -     -     -" (3(g) in India Code)
+_OMISSION_LINE_RE = re.compile(r"^\s*\d*\*[\s\-.*]*$")
+_CHAPTER_RE = re.compile(r"^\s*" + _FN_PREFIX + r"CHAPTER\s+[IVXLC]+[A-Z]?\]?\s*$")
+_BODY_START_RE = re.compile(
+    rf"^\s*(?:\*\*|{_FN_PREFIX}\((?:[a-z]{{1,4}}|\d{{1,3}}[A-Z]?)\)\s"
+    rf"|{_FN_PREFIX}\d{{1,3}}(?:-?[A-Z]{{1,3}})?\.\s|{_FN_PREFIX}CHAPTER\b)"
+)
+_ROMAN_AMBIGUOUS = frozenset({"i", "v", "x"})
+_ROMAN_CONTINUATIONS = frozenset({"ii", "iii", "iv", "vi", "vii", "viii", "ix", "xi"})
+# Omission markers left in official texts for repealed clauses (after stripping
+# digits/brackets/punctuation): "Omitted..." or only asterisks.
+_OMITTED_RE = re.compile(r"^(?:omitted\w*|\*+$)", re.IGNORECASE)
 
 
 def slugify(value: str) -> str:
@@ -35,6 +74,61 @@ def _base_fields(meta: DocumentMeta) -> dict:
 # ---------------------------------------------------------------------------
 
 
+def _strip_markdown(line: str) -> str:
+    line = re.sub(r"^\s*#{1,6}\s+", "", line)
+    line = line.replace("**", "")
+    # italic delimiters: "_Explanation.—For ..._" -> "Explanation.—For ..."
+    return re.sub(r"(?<![\w_])_(?=[^\s_])|(?<=[^\s_])_(?![\w_])", "", line)
+
+
+def normalize_statute_text(text: str) -> tuple[str, list[str]]:
+    """Remove layout artifacts from PDF/Markdown-derived statute text.
+
+    Formatting only - statutory wording is never rewritten. Removed:
+    Markdown emphasis/headings, page breaks and page numbers, rule lines,
+    CHAPTER headings (and their all-caps title line), omission markers, and
+    page-bottom amendment footnotes. Footnotes and omission markers are
+    returned as ``notes`` so callers can log/preserve them.
+    """
+    out: list[str] = []
+    notes: list[str] = []
+    in_footnotes = False
+    skip_chapter_title = False
+    for raw in text.splitlines():
+        body_start = bool(_BODY_START_RE.match(raw))
+        line = _strip_markdown(raw)
+        stripped = line.strip()
+        if _PAGE_BREAK_RE.match(line) or _RULE_LINE_RE.match(raw):
+            in_footnotes = False
+            continue
+        if _FOOTNOTE_RE.match(line) and not raw.lstrip().startswith("**"):
+            in_footnotes = True
+            notes.append(stripped)
+            continue
+        if in_footnotes:
+            if not stripped or _PAGE_NUMBER_RE.match(line):
+                continue
+            if not body_start:
+                notes[-1] = f"{notes[-1]} {stripped}"
+                continue
+            in_footnotes = False
+        if _OMISSION_LINE_RE.match(line):
+            notes.append(f"[omission marker] {stripped}")
+            continue
+        if _CHAPTER_RE.match(line):
+            skip_chapter_title = True
+            continue
+        if skip_chapter_title:
+            if not stripped:
+                continue
+            skip_chapter_title = False
+            letters = re.sub(r"[^A-Za-z]", "", stripped)
+            if letters and letters.isupper():
+                continue
+        out.append(line.rstrip())
+    return "\n".join(out).strip(), notes
+
+
 def _split_sections(text: str, default_section: str | None) -> list[tuple[str, str]]:
     matches = list(_SECTION_RE.finditer(text))
     if not matches:
@@ -50,16 +144,45 @@ def _split_sections(text: str, default_section: str | None) -> list[tuple[str, s
     return out
 
 
+def _next_marker_is_roman_continuation(body: str, after: int) -> bool:
+    """True if the next line-start "(..)" marker after ``after`` is (ii), (iii), ... ."""
+    m = _ANY_MARKER_RE.search(body, after)
+    return bool(m and m.group(1) in _ROMAN_CONTINUATIONS)
+
+
+def _is_top_level_clause(m: re.Match[str], accepted: list[re.Match[str]], body: str) -> bool:
+    letter = m.group(1)
+    if accepted and letter <= accepted[-1].group(1):
+        return False
+    if letter not in _ROMAN_AMBIGUOUS:
+        return True
+    # "(i)", "(v)", "(x)" may be a nested roman numeral. Accept as a top-level clause
+    # only if it is the next letter in the clause sequence (e.g. (i) directly after (h))
+    # and is not immediately followed by a roman continuation such as (ii).
+    if accepted and ord(letter) != ord(accepted[-1].group(1)) + 1:
+        return False
+    return not _next_marker_is_roman_continuation(body, m.end())
+
+
+def _is_omitted(clause_text: str) -> bool:
+    """Clause body is only an omission marker, e.g. "(g) [Omitted]" or "(g) * * *"."""
+    rest = _CLAUSE_RE.sub("", clause_text, count=1)
+    rest = re.sub(r"\d+|[\[\]().;,:\-—\s]", "", rest)
+    return rest == "" or bool(_OMITTED_RE.match(rest))
+
+
 def _split_clauses(body: str) -> tuple[str, list[tuple[str, str]]]:
     """Return (preamble, [(letter, clause_text)]).
 
     A clause marker is accepted only if its letter is strictly after the previous
     clause letter; otherwise it is treated as part of the current clause (guards
-    against nested (i)/(ii)-style enumerations re-starting the sequence).
+    against nested (i)/(ii)-style enumerations re-starting the sequence). Roman-
+    numeral-like letters are additionally checked against the expected sequence
+    so a nested "(i)" inside e.g. clause (d) is not mistaken for clause (i).
     """
     accepted: list[re.Match[str]] = []
     for m in _CLAUSE_RE.finditer(body):
-        if not accepted or m.group(1) > accepted[-1].group(1):
+        if _is_top_level_clause(m, accepted, body):
             accepted.append(m)
     if not accepted:
         return body.strip(), []
@@ -74,26 +197,43 @@ def _split_clauses(body: str) -> tuple[str, list[tuple[str, str]]]:
 def chunk_statute(doc: RawDocument) -> list[CanonicalChunk]:
     meta = doc.meta
     chunks: list[CanonicalChunk] = []
-    for sec, body in _split_sections(doc.text, meta.section_prefix):
+    text, notes = normalize_statute_text(doc.text)
+    if notes:
+        logger.info(
+            "%s: removed %d footnote/omission lines from chunk text", meta.doc_id, len(notes)
+        )
+    # Acts other than the Patents Act carry a label prefix (e.g. "BDA 3(a)") so their
+    # sections are never mistaken for Patents Act Section 3 clauses.
+    label = (lambda s: f"{meta.section_label_prefix} {s}") if meta.section_label_prefix else (lambda s: s)
+    for sec, body in _split_sections(text, meta.section_prefix):
         preamble, clauses = _split_clauses(body)
         sec_slug = slugify(sec)
         if preamble:
             chunks.append(
                 CanonicalChunk(
                     id=f"{meta.doc_id}_{sec_slug}",
-                    title=f"{meta.title} — Section {sec}",
+                    title=f"{meta.title} — Section {label(sec)}",
                     text=preamble,
-                    section=sec,
+                    section=label(sec),
                     **_base_fields(meta),
                 )
             )
         for letter, clause_text in clauses:
+            if _is_omitted(clause_text):
+                # Omitted clauses (e.g. 3(g)) never become active legal chunks.
+                logger.warning(
+                    "%s: Section %s(%s) is an omission marker in the source; no chunk emitted",
+                    meta.doc_id,
+                    sec,
+                    letter,
+                )
+                continue
             chunks.append(
                 CanonicalChunk(
                     id=f"{meta.doc_id}_{sec_slug}_{letter}",
-                    title=f"{meta.title} — Section {sec}({letter})",
+                    title=f"{meta.title} — Section {label(f'{sec}({letter})')}",
                     text=clause_text,
-                    section=f"{sec}({letter})",
+                    section=label(f"{sec}({letter})"),
                     **_base_fields(meta),
                 )
             )

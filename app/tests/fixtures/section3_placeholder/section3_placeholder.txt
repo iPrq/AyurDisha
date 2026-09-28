@@ -1,0 +1,39 @@
+3. [TEST FIXTURE — PLACEHOLDER, NOT STATUTORY TEXT] Section 3 preamble placeholder,—
+
+(a) placeholder alpha body.
+
+(b) placeholder bravo body.
+
+(c) placeholder charlie body.
+
+(d) placeholder delta body, with a nested list:
+(i) nested delta item one;
+(ii) nested delta item two.
+
+(e) placeholder echo body.
+
+(f) placeholder foxtrot body.
+
+(g) [Omitted]
+
+(h) placeholder hotel body.
+
+(i) placeholder india body.
+
+(j) placeholder juliett body.
+
+(k) placeholder kilo body:
+(i) nested kilo item one;
+(ii) nested kilo item two.
+
+(l) placeholder lima body.
+
+(m) placeholder mike body.
+
+(n) placeholder november body.
+
+(o) placeholder oscar body.
+
+(p) placeholder papa body.
+
+4. [TEST FIXTURE — PLACEHOLDER] Next section placeholder.

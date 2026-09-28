@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import json
+import logging
+import re
 from typing import Any, TypeVar
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from graph.models import RetrievedSource
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -71,17 +75,66 @@ def structured_invoke(
             return schema.model_validate(json.loads(raw))
         raise TypeError(f"Injectable LLM returned unsupported type: {type(raw)}")
 
-    structured = model.with_structured_output(schema)
-    result = structured.invoke(
-        [
-            SystemMessage(content=system),
-            HumanMessage(content=user),
-        ]
+    messages = [SystemMessage(content=system), HumanMessage(content=user)]
+    try:
+        result = model.with_structured_output(schema).invoke(messages)
+        if isinstance(result, schema):
+            return result
+        if isinstance(result, BaseModel):
+            return schema.model_validate(result.model_dump())
+        if isinstance(result, dict):
+            return schema.model_validate(result)
+        raise TypeError(f"Structured LLM returned unsupported type: {type(result)}")
+    except Exception as exc:  # noqa: BLE001 - provider-side structured output unavailable
+        logger.warning(
+            "Structured output failed for %s (%s); falling back to JSON prompting",
+            schema.__name__,
+            str(exc).splitlines()[0][:200],
+        )
+    return _json_prompt_invoke(model, schema, messages)
+
+
+_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+
+
+def _extract_json_object(text: str) -> Any:
+    """Parse the first JSON object in a model reply (ignores <think> blocks / code fences)."""
+    cleaned = _FENCE_RE.sub("", _THINK_RE.sub("", text or "").strip()).strip()
+    try:
+        return json.loads(cleaned)
+    except ValueError:
+        pass
+    start = cleaned.find("{")
+    if start < 0:
+        raise ValueError("model reply contains no JSON object")
+    obj, _ = json.JSONDecoder().raw_decode(cleaned[start:])
+    return obj
+
+
+def _json_prompt_invoke(model: Any, schema: type[T], messages: list, *, attempts: int = 2) -> T:
+    """Fallback: ask for plain JSON matching the schema; validate with Pydantic in Python.
+
+    Validation is exactly as strict as the structured path: anything that does not
+    validate against ``schema`` is rejected (retried once with the error, then raised).
+    """
+    instructions = (
+        "Respond with ONLY one JSON object (no prose, no code fences) that validates "
+        "against this JSON Schema:\n" + json.dumps(schema.model_json_schema())
     )
-    if isinstance(result, schema):
-        return result
-    if isinstance(result, BaseModel):
-        return schema.model_validate(result.model_dump())
-    if isinstance(result, dict):
-        return schema.model_validate(result)
-    raise TypeError(f"Structured LLM returned unsupported type: {type(result)}")
+    convo = [*messages, HumanMessage(content=instructions)]
+    last_error: Exception | None = None
+    for _ in range(attempts):
+        reply = model.invoke(convo)
+        content = getattr(reply, "content", reply)
+        if isinstance(content, list):  # some providers return content parts
+            content = "".join(p.get("text", "") if isinstance(p, dict) else str(p) for p in content)
+        try:
+            return schema.model_validate(_extract_json_object(str(content)))
+        except (ValueError, ValidationError) as exc:
+            last_error = exc
+            convo = [*convo, reply, HumanMessage(
+                content=f"That was not valid for the schema: {str(exc)[:500]}. "
+                        "Reply again with ONLY the corrected JSON object."
+            )]
+    raise ValueError(f"LLM did not return valid {schema.__name__} JSON: {last_error}")

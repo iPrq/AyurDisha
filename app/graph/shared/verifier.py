@@ -20,6 +20,14 @@ from llm.provider import get_chat_model
 from llm.structured import format_sources_for_prompt, structured_invoke
 
 
+# Escalation reasons that always force HUMAN_REVIEW_REQUIRED.
+HUMAN_REVIEW_REASONS = (
+    "ambiguous_botanical",
+    "insufficient_international_evidence",
+    "section3_evidence_gap",
+)
+
+
 def dedupe_claims(claims: list[str]) -> list[str]:
     seen: set[str] = set()
     unique: list[str] = []
@@ -155,7 +163,7 @@ def verify_claims(
     support_ratio = supported / total
 
     reasons.extend(result.escalation_reasons)
-    if "ambiguous_botanical" in reasons or "insufficient_international_evidence" in reasons:
+    if any(r in reasons for r in HUMAN_REVIEW_REASONS):
         outcome = VerificationOutcome.HUMAN_REVIEW_REQUIRED
     elif stripped and support_ratio < cfg.verification_min_support_ratio:
         outcome = VerificationOutcome.FAIL

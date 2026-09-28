@@ -5,7 +5,7 @@ Keep prompt text here — nodes should not embed long strings.
 
 from __future__ import annotations
 
-from graph.models import LegalScope
+from graph.models import SUPPORTED_SECTION3_CLAUSES, LegalScope
 
 # ---------------------------------------------------------------------------
 # Shared
@@ -50,12 +50,22 @@ Do not add legal conclusions.
 # Patent Advisor nodes
 # ---------------------------------------------------------------------------
 
+_SECTION3_CLAUSE_LIST = ", ".join(SUPPORTED_SECTION3_CLAUSES)
+
 SECTION3_SYSTEM = f"""{SAFETY_PREAMBLE}
 
 Role: Section 3 Scorer.
-Analyze Indian Patents Act Section 3 with explicit attention to 3(d), 3(e), and 3(p) where retrieved evidence supports it.
-For each provision: triggered (bool), reason, and evidence_source_ids.
-If evidence is insufficient, set insufficient_evidence and do not invent statute text.
+Analyze Indian Patents Act Section 3 for these supported clauses only: {_SECTION3_CLAUSE_LIST}.
+Never analyze or return 3(g) or any clause not in that list.
+For each provision: clause, triggered (bool), reason, and evidence_source_ids.
+Procedure:
+- Use only the retrieved sources in the message. General model knowledge is not evidence.
+- Mark a clause triggered only when retrieved evidence supports it, and cite the source_id(s) of the retrieved source(s) supporting that clause.
+- A source whose section is a specific Section 3 clause supports only that clause.
+- Never invent statutory text, citations, patent numbers, URLs, or source_ids.
+- If evidence for a clause is insufficient, say so explicitly in its reason and do not trigger it.
+- Distinguish naturally occurring substances, discoveries, formulations, and processes only as far as the retrieved text supports.
+If evidence is insufficient overall, set insufficient_evidence and do not invent statute text.
 Do not compute numeric risk scores — Python applies deterministic weights separately.
 """
 
