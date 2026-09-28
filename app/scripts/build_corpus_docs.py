@@ -6,12 +6,16 @@ Run from app/ after scripts/fetch_sources.py:
 
 Reads   data/raw/sources/hf_indian_legal_acts/*.md          (verbatim Act text)
         data/raw/sources/hupd_sample_subset/*.jsonl        (US patent applications)
+        data/raw/sources/<user source>/*.pdf|csv           (scripts/import_user_sources.py)
 Writes  data/raw/corpus/<doc_id>.(md|json) + <doc_id>.meta.json + CORPUS_PROVENANCE.csv
 
-Each corpus document is a VERBATIM excerpt of the source text, cut at fixed
+Each Act document is a VERBATIM excerpt of the source text, cut at fixed
 anchors (no rewording). Layout artifacts (Markdown, page footnotes, page breaks)
 are handled later by the statute chunker, not here. Fails loudly if an anchor
 is missing rather than guessing. Does not index anything.
+
+PDF sources are converted with formatting-only cleanup (see scripts/pdf_corpus.py);
+that step dominates the run time (a few minutes for ~1,500 pages).
 """
 
 from __future__ import annotations
@@ -22,7 +26,16 @@ import hashlib
 import json
 import re
 import sys
+from collections import Counter
 from pathlib import Path
+
+from pdf_corpus import (
+    clean_pharmacopoeia_pages,
+    extract_pages,
+    pharmacopoeia_text,
+    reflow_prose,
+    strip_page_furniture,
+)
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 SRC = APP_ROOT / "data" / "raw" / "sources" / "hf_indian_legal_acts"
@@ -60,6 +73,14 @@ EXTRACTS = [
         "section_label_prefix": "DCA",
     },
 ]
+
+
+def _matches_sha256(data: bytes, expected: str) -> bool:
+    """Exact bytes, allowing only git core.autocrlf line-ending conversion."""
+    lf = data.replace(b"\r\n", b"\n")
+    return expected in {
+        hashlib.sha256(v).hexdigest() for v in (data, lf, lf.replace(b"\n", b"\r\n"))
+    }
 
 
 def _provenance_for(source_file: str) -> dict:
@@ -114,7 +135,7 @@ def build_hupd_patents() -> dict:
     with (HUPD_SRC / "PROVENANCE.csv").open(encoding="utf-8") as fh:
         prov = next(csv.DictReader(fh))
     src_bytes = src.read_bytes()
-    if hashlib.sha256(src_bytes).hexdigest() != prov["sha256"]:
+    if not _matches_sha256(src_bytes, prov["sha256"]):
         raise RuntimeError(f"{src} does not match its recorded SHA-256")
     records = []
     for line in src_bytes.decode("utf-8").splitlines():
@@ -163,6 +184,208 @@ def build_hupd_patents() -> dict:
     }
 
 
+SOURCES_ROOT = APP_ROOT / "data" / "raw" / "sources"
+
+# Glyphs the Indian Kanoon PDF export substitutes for punctuation/symbols, read off
+# context: "‡-crystal form" (β), "10 ‹mol/liter" (µ), "211Œ-213Œ" (°), "GleevecŽ" (®).
+# "†" is almost always a dash; the one "†crystal (sic ‡-crystal)" (α) stays wrong.
+_KANOON_GLYPHS = {
+    "□": "“", "‚": "”", "„": "‘", "ƒ": "’", "†": "–", "€": "…", "‡": "β",
+    "‹": "µ", "Œ": "°", "Ž": "®", "‰": "•", "Š": "—",
+}
+
+PDF_DOCS = [
+    {
+        "doc_id": "cgpdtm_ayush_guidelines_2025",
+        "source_dir": "cgpdtm_ayush_guidelines_2025",
+        "source_file": "ayush_examination_guidelines_2025.pdf",
+        "title": "Guidelines for Examination of Ayush Related Inventions (CGPDTM, 2025)",
+        "source_type": "guideline",
+        "mode": "prose",
+        "char_fixes": {"\uf0b7": "•", "\xad": ""},
+        "scope": "Full document incl. cover pages listing granted Ayush patents",
+    },
+    {
+        "doc_id": "cgpdtm_pharma_guidelines_draft_2026",
+        "source_dir": "cgpdtm_pharma_guidelines_draft_2026",
+        "source_file": "pharma_examination_guidelines_draft_2026.pdf",
+        "title": (
+            "DRAFT Guidelines for Examination of Patent Applications in the Field of "
+            "Pharmaceuticals (CGPDTM, 2026)"
+        ),
+        "source_type": "guideline",
+        "mode": "prose",
+        "layout": True,  # default extraction emits one word per line for this PDF
+        "scope": "Full DRAFT document (Hindi cover text is garbled by extraction)",
+    },
+    {
+        "doc_id": "sc_novartis_v_uoi_2013",
+        "source_dir": "sc_novartis_v_uoi_2013",
+        "source_file": "novartis_v_union_of_india_2013.pdf",
+        "title": "Novartis AG v. Union of India & Ors (Supreme Court of India, 1 April 2013)",
+        "source_type": "case_law",
+        "source_url": "http://indiankanoon.org/doc/165776436/",
+        "effective_date": "2013-04-01",
+        "mode": "prose",
+        "char_fixes": _KANOON_GLYPHS,
+        "scope": "Full judgment (Civil Appeal Nos. 2706-2716 of 2013)",
+    },
+    {
+        "doc_id": "api_part1_vol1",
+        "source_dir": "ayurvedic_pharmacopoeia_india",
+        "source_file": "api_part1_vol1.pdf",
+        "title": "The Ayurvedic Pharmacopoeia of India, Part I, Vol. I",
+        "source_type": "prior_art",
+        "mode": "pharmacopoeia",
+        "fonts": "A",
+        "scope": "Single-drug monographs; legacy-font diacritics restored to IAST",
+    },
+    {
+        "doc_id": "api_part2_vol2",
+        "source_dir": "ayurvedic_pharmacopoeia_india",
+        "source_file": "api_part2_vol2.pdf",
+        "title": "The Ayurvedic Pharmacopoeia of India, Part II (Formulations), Vol. II",
+        "source_type": "prior_art",
+        "effective_date": "2009-01-01",
+        "mode": "pharmacopoeia",
+        "fonts": "AB",
+        "scope": "Formulation monographs; diacritics restored; Kruti-Dev Sanskrit verses dropped",
+    },
+    {
+        "doc_id": "afi_part1",
+        "source_dir": "ayurvedic_formulary_india",
+        "source_file": "afi_part1.pdf",
+        "title": "The Ayurvedic Formulary of India, Part I (Second Revised Edition)",
+        "source_type": "prior_art",
+        "mode": "pharmacopoeia",
+        "fonts": "A",
+        "scope": "Compound formulations; diacritics restored; Devanagari-font Sanskrit verses dropped",
+    },
+    {
+        "doc_id": "turmeric_patent_review_2021",
+        "source_dir": "turmeric_patent_review_2021",
+        "source_file": "turmeric_patent_case_review_2021.pdf",
+        "title": "A Brief Review on the Turmeric Patent Case (NDC E-BIOS 1:83-88, 2021)",
+        "source_type": "comparative_ip",
+        "jurisdiction": "us",
+        "legal_scope": "international",
+        "mode": "prose",
+        "scope": "Full article (US turmeric patent revocation; TK documentation)",
+    },
+]
+
+
+def _user_provenance(source_dir: str, stored_filename: str) -> dict:
+    prov = SOURCES_ROOT / source_dir / "PROVENANCE.csv"
+    with prov.open(encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            if row["stored_filename"] == stored_filename:
+                return row
+    raise RuntimeError(f"{stored_filename} not listed in {prov}; run scripts/import_user_sources.py")
+
+
+def _verified_source(source_dir: str, stored_filename: str) -> tuple[Path, dict]:
+    path = SOURCES_ROOT / source_dir / stored_filename
+    prov = _user_provenance(source_dir, stored_filename)
+    if not _matches_sha256(path.read_bytes(), prov["sha256"]):
+        raise RuntimeError(f"{path} does not match its recorded SHA-256")
+    return path, prov
+
+
+def _write_meta(doc_id: str, **fields) -> None:
+    meta = {
+        "doc_id": doc_id,
+        "title": fields["title"],
+        "source_type": fields["source_type"],
+        "source_url": fields.get("source_url"),
+        "effective_date": fields.get("effective_date"),
+        "jurisdiction": fields.get("jurisdiction", "india"),
+        "legal_scope": fields.get("legal_scope", "domestic"),
+        "section_prefix": None,
+        "section_label_prefix": None,
+        "is_fixture": False,
+    }
+    (OUT / f"{doc_id}.meta.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8", newline="\n")
+
+
+def _user_row(doc: Path, doc_id: str, scope: str, source_dir: str, prov: dict) -> dict:
+    return {
+        "doc_id": doc_id,
+        "corpus_file": doc.name,
+        "scope": scope,
+        "authority_level": prov["authority_level"],
+        "derived_from": f"data/raw/sources/{source_dir}/{prov['stored_filename']}",
+        "derived_from_sha256": prov["sha256"],
+        "original_source_url": prov["original_source_url"],
+        "upstream_dataset": prov["source_url"],
+        "upstream_revision": prov["upstream_revision"],
+        "built_utc": TODAY,
+        "sha256": hashlib.sha256(doc.read_bytes()).hexdigest(),
+        "bytes": doc.stat().st_size,
+    }
+
+
+def build_pdf_doc(spec: dict) -> dict:
+    path, prov = _verified_source(spec["source_dir"], spec["source_file"])
+    pages = extract_pages(path, layout=spec.get("layout", False))
+    dropped = 0
+    if spec["mode"] == "pharmacopoeia":
+        page_lines, dropped = clean_pharmacopoeia_pages(pages, spec["fonts"])
+        text = pharmacopoeia_text(page_lines)
+    else:
+        text = reflow_prose(strip_page_furniture(pages))
+    for bad, good in spec.get("char_fixes", {}).items():
+        text = text.replace(bad, good)
+    if not text.strip():
+        raise RuntimeError(f"{path.name}: no text extracted")
+    doc = OUT / f"{spec['doc_id']}.md"
+    doc.write_text(text, encoding="utf-8", newline="\n")
+    _write_meta(**spec)
+    odd = Counter(ch for ch in text if ord(ch) > 0x7E and not ("\u0100" <= ch <= "\u1eff"))
+    extra = f", dropped {dropped} verse lines" if dropped else ""
+    print(f"[OK] {doc.name}: {len(pages)} pages -> {len(text):,} chars{extra}; "
+          f"top non-IAST chars {odd.most_common(8)}")
+    scope = spec["scope"] + (f"; {dropped} undecodable verse lines dropped" if dropped else "")
+    return _user_row(doc, spec["doc_id"], scope, spec["source_dir"], prov)
+
+
+def build_lens_patents() -> dict:
+    """Indian patents (Lens.org export) -> patents JSON. Rows without an abstract are
+    skipped (the loader requires one); fields are copied, not rewritten."""
+    source_dir, stored = "lens_in_patents", "lens_in_patents_export.csv"
+    path, prov = _verified_source(source_dir, stored)
+    records, skipped = [], 0
+    with path.open(encoding="utf-8", newline="") as fh:
+        for r in csv.DictReader(fh):
+            abstract = (r.get("Abstract") or "").strip()
+            title = (r.get("Title") or "").strip().strip('"').strip()
+            if not abstract or not title:
+                skipped += 1
+                continue
+            records.append({
+                "publication_number": r["Display Key"].strip(),
+                "title": title,
+                "abstract": abstract,
+                "first_claim": None,
+                "url": (r.get("URL") or "").strip() or None,
+                "publication_date": (r.get("Publication Date") or "").strip() or None,
+                "jurisdiction": "india",
+            })
+    doc_id = "lens_in_patents"
+    doc = OUT / f"{doc_id}.json"
+    doc.write_text(json.dumps(records, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    _write_meta(
+        doc_id,
+        title="Indian patent documents - Lens.org export",
+        source_type="patent",
+        source_url="https://lens.org",
+    )
+    print(f"[OK] {doc.name}: {len(records)} IN patent records ({skipped} skipped: no abstract/title)")
+    scope = (f"{len(records)} IN records with abstracts ({skipped} of {len(records) + skipped} "
+             "skipped: no abstract); broad export incl. non-herbal subject matter")
+    return _user_row(doc, doc_id, scope, source_dir, prov)
+
+
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     rows = []
@@ -170,9 +393,10 @@ def main() -> int:
         src_path = SRC / spec["source_file"]
         prov = _provenance_for(spec["source_file"])
         src_bytes = src_path.read_bytes()
-        if hashlib.sha256(src_bytes).hexdigest() != prov["sha256"]:
+        if not _matches_sha256(src_bytes, prov["sha256"]):
             raise RuntimeError(f"{src_path} does not match its recorded SHA-256")
-        excerpt = _cut(src_bytes.decode("utf-8"), spec["start"], spec["end"], spec.get("after"))
+        text = src_bytes.decode("utf-8").replace("\r\n", "\n")
+        excerpt = _cut(text, spec["start"], spec["end"], spec.get("after"))
         doc = OUT / f"{spec['doc_id']}.md"
         doc.write_text(excerpt, encoding="utf-8", newline="\n")
         meta = {
@@ -206,6 +430,8 @@ def main() -> int:
         })
         print(f"[OK] {doc.name}: {spec['scope']} ({doc.stat().st_size:,} bytes)")
     rows.append(build_hupd_patents())
+    rows.append(build_lens_patents())
+    rows.extend(build_pdf_doc(spec) for spec in PDF_DOCS)
     with (OUT / "CORPUS_PROVENANCE.csv").open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0]))
         w.writeheader()

@@ -16,3 +16,4 @@ wheels/
 qdrant_data/
 
 # Generated retrieval artifacts (rebuild with: uv run python -m ingest.build_index)
+new_data/

@@ -34,6 +34,10 @@ def test_tokenize_keeps_clause_refs():
     assert "the" not in tokenize("the Act")
 
 
+def test_tokenize_folds_iast_diacritics():
+    assert tokenize("Aśvagandhā Ghṛta") == ["asvagandha", "ghrta"]
+
+
 def test_bm25_ranks_relevant_first():
     store = BM25Store(CORPUS)
     hits = store.search("known substance efficacy", k=3)

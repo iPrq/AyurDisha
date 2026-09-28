@@ -29,7 +29,9 @@ class DocumentMeta(BaseModel):
 
     doc_id: str
     title: str
-    source_type: Literal["statute", "guideline", "patent", "comparative_ip", "regulation"]
+    source_type: Literal[
+        "statute", "guideline", "patent", "comparative_ip", "regulation", "case_law", "prior_art"
+    ]
     source_url: str | None = None
     effective_date: str | None = None
     jurisdiction: str

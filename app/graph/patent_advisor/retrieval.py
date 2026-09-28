@@ -17,6 +17,7 @@ PATENT_SOURCE_TYPES = [
     "patent",
     "comparative_ip",
     "prior_art",
+    "case_law",
     "guidance",
 ]
 

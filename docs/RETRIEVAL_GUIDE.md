@@ -128,7 +128,7 @@ Metadata is never guessed.
 | Field | Notes |
 |-------|-------|
 | `doc_id` | lowercase snake_case; prefix of every chunk ID |
-| `source_type` | `statute`, `guideline`, `patent`, `comparative_ip` |
+| `source_type` | `statute`, `guideline`, `patent`, `comparative_ip`, `regulation`, `case_law` (judgments), `prior_art` (pharmacopoeia / formulary / TK literature) |
 | `legal_scope` | `domestic` or `international`. **Never mark Indian law as international.** |
 | `jurisdiction` | e.g. `india`, `epo`, `uspto`, `wipo` (lower-cased automatically) |
 | `section_prefix` | statutes only: section number if the file holds one section body without an `N.` heading |
@@ -148,7 +148,7 @@ a `.json` list or `.jsonl` of records:
 | Source type | Chunks | Example ID |
 |-------------|--------|------------|
 | `statute` | One chunk per clause at line start `(d)`, including its Explanation; section preamble separately | `india_patents_act_1970_3_d` |
-| `guideline` / `comparative_ip` | Heading + paragraph groups (≤ ~1500 chars, paragraphs never split) | `ipo_tk_guidelines_p004` |
+| `guideline` / `comparative_ip` / `regulation` / `case_law` / `prior_art` | Heading + paragraph groups (≤ ~1500 chars, paragraphs never split) | `ipo_tk_guidelines_p004` |
 | `patent` | Abstract + first claim | `patent_in123456_abstract`, `patent_in123456_claim_1` |
 
 Statute clause detection accepts `(x)` markers in increasing letter order. Roman-looking
@@ -164,6 +164,21 @@ never becomes an active provision. Check chunk output for new statutes before in
 2. IPO guidelines on traditional knowledge / biological material
 3. Relevant patent abstracts
 4. Comparative IP sources (`legal_scope=international`)
+
+### Two-layer layout of `data/raw/`
+
+- `data/raw/sources/<source_id>/` — originals, byte-for-byte, with a `PROVENANCE.csv`.
+  No sidecars, so never ingested directly. Filled by `scripts/fetch_sources.py`
+  (downloads) and `scripts/import_user_sources.py` (files dropped into `app/new_data/`).
+- `data/raw/corpus/` — ingestible documents + sidecars + `CORPUS_PROVENANCE.csv`, derived by
+  `scripts/build_corpus_docs.py` (Act excerpts, patent JSON, and PDF text with
+  formatting-only cleanup: page furniture removed, legacy-font IAST restored, undecodable
+  Devanagari verses dropped — see `scripts/pdf_corpus.py`).
+
+```powershell
+uv run python scripts/import_user_sources.py   # new_data/ -> data/raw/sources/
+uv run python scripts/build_corpus_docs.py     # sources/ -> corpus/ (a few minutes: PDF extraction)
+```
 
 Download specific documents deliberately; do not scrape sites indiscriminately.
 Record `source_url` and `effective_date` exactly as published. Only commit raw files

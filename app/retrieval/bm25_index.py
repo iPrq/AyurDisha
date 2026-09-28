@@ -7,6 +7,7 @@ import logging
 import pickle
 import platform
 import re
+import unicodedata
 from collections.abc import Callable
 from importlib.metadata import version as pkg_version
 from pathlib import Path
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 BM25_PICKLE = "bm25.pkl"
 BM25_DOCUMENTS = "bm25_documents.json"
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 
 # Keeps legal clause references like "3(d)" as single tokens.
 _TOKEN_RE = re.compile(r"[a-z0-9]+(?:\([a-z]\))?")
@@ -34,8 +35,15 @@ _STOPWORDS = frozenset(
 )
 
 
+def _fold_diacritics(text: str) -> str:
+    """IAST / accented Latin -> ASCII base letters, e.g. "Aśvagandhā" -> "Asvagandha"."""
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+
+
 def tokenize(text: str) -> list[str]:
-    return [t for t in _TOKEN_RE.findall((text or "").lower()) if t not in _STOPWORDS]
+    folded = _fold_diacritics((text or "").lower())
+    return [t for t in _TOKEN_RE.findall(folded) if t not in _STOPWORDS]
 
 
 def _runtime_fingerprint() -> dict[str, str]:
