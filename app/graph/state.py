@@ -51,6 +51,8 @@ class PatentAdvisorState(TypedDict):
     jurisdiction: str
     legal_scope: LegalScope | str
     user_query: NotRequired[str]
+    # Uploaded disclosure text (prompt context only, never evidence)
+    document_text: NotRequired[str]
 
     # Parsed / normalized input (InputParser)
     botanical_input: NotRequired[str]

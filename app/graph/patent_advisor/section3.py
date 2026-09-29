@@ -15,7 +15,7 @@ from graph.models import (
     normalize_section3_clause_ref,
 )
 from graph.patent_advisor.risk import calculate_patentability_risk
-from graph.prompts import SECTION3_SYSTEM, legal_scope_instruction
+from graph.prompts import SECTION3_SYSTEM, document_context_block, legal_scope_instruction
 from graph.state import PatentAdvisorState
 from llm.provider import get_chat_model
 from llm.structured import format_sources_for_prompt, structured_invoke
@@ -84,6 +84,7 @@ def score_section3(
     product: str | None = None,
     llm: Any | None = None,
     settings: Settings | None = None,
+    document_text: str | None = None,
 ) -> Section3Results:
     """LLM-based Section 3 analysis grounded only in retrieved sources."""
     cfg = settings or get_settings()
@@ -126,6 +127,7 @@ def score_section3(
             f"supports it: {', '.join(SUPPORTED_SECTION3_CLAUSES)}. Never return 3(g).",
             "Cite evidence_source_ids from the sources below only.",
             "Do not invent statutes or foreign law.",
+            *document_context_block(document_text),
             "Retrieved sources:",
             format_sources_for_prompt(sources),
         ]
@@ -155,6 +157,7 @@ def section3_scorer_node(
         product=state.get("product"),
         llm=llm,
         settings=settings,
+        document_text=state.get("document_text"),
     )
     risk = calculate_patentability_risk(section3, settings=settings or get_settings())
     update: dict[str, Any] = {

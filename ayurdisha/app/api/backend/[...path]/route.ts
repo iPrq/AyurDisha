@@ -11,10 +11,13 @@ async function proxy(
   const { path } = await params;
   const url = `${BACKEND_URL}/${path.join("/")}${req.nextUrl.search}`;
   try {
+    const hasBody = req.method !== "GET" && req.method !== "HEAD";
     const res = await fetch(url, {
       method: req.method,
-      headers: { "Content-Type": "application/json" },
-      body: req.method === "GET" ? undefined : await req.text(),
+      headers: {
+        "Content-Type": req.headers.get("content-type") ?? "application/json",
+      },
+      body: hasBody ? await req.arrayBuffer() : undefined,
       cache: "no-store",
     });
     return new Response(await res.text(), {

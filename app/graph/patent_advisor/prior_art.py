@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from graph.models import LegalScope, PriorArtResult, RetrievedSource
-from graph.prompts import PRIOR_ART_SYSTEM, legal_scope_instruction
+from graph.prompts import PRIOR_ART_SYSTEM, document_context_block, legal_scope_instruction
 from graph.state import PatentAdvisorState
 from llm.provider import get_chat_model
 from llm.structured import format_sources_for_prompt, structured_invoke
@@ -24,6 +24,7 @@ def analyze_prior_art(
     botanical_name: str | None = None,
     product: str | None = None,
     llm: Any | None = None,
+    document_text: str | None = None,
 ) -> PriorArtResult:
     scope = _coerce_scope(legal_scope)
     model = llm if llm is not None else get_chat_model()
@@ -46,6 +47,7 @@ def analyze_prior_art(
             f"botanical_name={botanical_name or ''}",
             "Summarize prior-art / patent-information findings ONLY from sources below.",
             "Never invent patent numbers, titles, or URLs.",
+            *document_context_block(document_text),
             "Retrieved sources:",
             format_sources_for_prompt(sources),
         ]
@@ -76,6 +78,7 @@ def prior_art_node(
         botanical_name=state.get("botanical_name"),
         product=state.get("product"),
         llm=llm,
+        document_text=state.get("document_text"),
     )
     update: dict[str, Any] = {"prior_art": result}
     if result.insufficient_evidence:

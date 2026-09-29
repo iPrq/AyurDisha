@@ -134,6 +134,25 @@ export interface PatentAdvisorRequest {
   ingredients: string[];
   legal_scope: LegalScope;
   user_query?: string | null;
+  document_text?: string | null;
+}
+
+export interface PdfPageInfo {
+  page: number;
+  method: "text" | "ocr" | "empty";
+  chars: number;
+}
+
+export interface PatentDocumentExtractResponse {
+  filename: string | null;
+  product: string;
+  ingredients: string[];
+  summary: string;
+  document_text: string;
+  pages: PdfPageInfo[];
+  total_pages: number;
+  ocr_used: boolean;
+  truncated: boolean;
 }
 
 export interface PatentAdvisorResponse extends BaseResponse {

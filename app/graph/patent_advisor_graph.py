@@ -81,6 +81,7 @@ def run_patent_advisor(
     jurisdiction: str = "india",
     legal_scope: str = "domestic",
     user_query: str | None = None,
+    document_text: str | None = None,
     kg: BotanicalKnowledgeGraph | None = None,
     retriever: LegalRetriever | None = None,
     settings: Settings | None = None,
@@ -99,4 +100,6 @@ def run_patent_advisor(
     }
     if user_query:
         initial["user_query"] = user_query
+    if document_text:
+        initial["document_text"] = document_text
     return app.invoke(initial)

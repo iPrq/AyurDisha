@@ -86,6 +86,15 @@ class Settings(BaseModel):
     # Product Review: cap on ingredients searched for resource accessibility
     product_review_max_resources: int = Field(default=3)
 
+    # PDF upload (Patent Advisor): text layer first, local RapidOCR for scanned pages
+    pdf_max_bytes: int = Field(default=20 * 1024 * 1024)
+    pdf_max_pages: int = Field(default=30)
+    pdf_ocr_enabled: bool = Field(default=True)
+    pdf_ocr_min_chars: int = Field(default=50)
+    pdf_ocr_dpi: int = Field(default=200)
+    # Max document characters passed into Patent Advisor prompts
+    patent_doc_context_chars: int = Field(default=12000)
+
     def redacted(self) -> dict[str, object]:
         """Settings dump safe for logs (secrets masked)."""
         data = self.model_dump()
@@ -187,4 +196,10 @@ def get_settings() -> Settings:
         web_search_timeout=_env_float("WEB_SEARCH_TIMEOUT", 15.0),
         web_search_country=(_env_str("WEB_SEARCH_COUNTRY", "in") or "in").lower(),
         product_review_max_resources=_env_int("PRODUCT_REVIEW_MAX_RESOURCES", 3),
+        pdf_max_bytes=_env_int("PDF_MAX_BYTES", 20 * 1024 * 1024),
+        pdf_max_pages=_env_int("PDF_MAX_PAGES", 30),
+        pdf_ocr_enabled=_env_bool("PDF_OCR_ENABLED", True),
+        pdf_ocr_min_chars=_env_int("PDF_OCR_MIN_CHARS", 50),
+        pdf_ocr_dpi=_env_int("PDF_OCR_DPI", 200),
+        patent_doc_context_chars=_env_int("PATENT_DOC_CONTEXT_CHARS", 12000),
     )

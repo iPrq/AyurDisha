@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from config import get_settings
 from graph.state import PatentAdvisorState
 
 
@@ -25,13 +26,17 @@ def parse_patent_advisor_input(state: PatentAdvisorState) -> dict[str, Any]:
     if user_query:
         notes_parts.append(f"user_query={user_query}")
 
-    return {
+    update: dict[str, Any] = {
         "product": product,
         "ingredients": ingredients,
         "botanical_input": botanical_input,
         "parsed_notes": "; ".join(notes_parts),
         "retry_count": int(state.get("retry_count") or 0),
     }
+    document_text = (state.get("document_text") or "").strip()
+    if document_text:
+        update["document_text"] = document_text[: get_settings().patent_doc_context_chars]
+    return update
 
 
 def input_parser_node(state: PatentAdvisorState) -> dict[str, Any]:

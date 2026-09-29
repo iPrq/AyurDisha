@@ -320,6 +320,39 @@ class PatentAdvisorRequest(BaseModel):
         default=None,
         description="Optional free-text query; product/ingredients remain primary",
     )
+    document_text: str | None = Field(
+        default=None,
+        max_length=200_000,
+        description="Text extracted from an uploaded disclosure PDF; context only, never evidence",
+    )
+
+
+class PatentDocumentFields(BaseModel):
+    """LLM extraction of form fields from an uploaded invention disclosure."""
+
+    product: str = Field(default="", description="Short product / invention name")
+    ingredients: list[str] = Field(
+        default_factory=list, description="Botanical / herbal ingredients named in the document"
+    )
+    summary: str = Field(default="", description="2-4 sentence summary of the invention")
+
+
+class PdfPageInfo(BaseModel):
+    page: int
+    method: Literal["text", "ocr", "empty"]
+    chars: int
+
+
+class PatentDocumentExtractResponse(BaseModel):
+    filename: str | None = None
+    product: str = ""
+    ingredients: list[str] = Field(default_factory=list)
+    summary: str = ""
+    document_text: str
+    pages: list[PdfPageInfo] = Field(default_factory=list)
+    total_pages: int
+    ocr_used: bool = False
+    truncated: bool = False
 
 
 class PatentAdvisorResponse(BaseModel):

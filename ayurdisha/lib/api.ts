@@ -3,6 +3,7 @@ import type {
   NbaAbsResponse,
   PatentAdvisorRequest,
   PatentAdvisorResponse,
+  PatentDocumentExtractResponse,
   ProductReviewRequest,
   ProductReviewResponse,
 } from "./types";
@@ -10,9 +11,12 @@ import type {
 const BASE = "/api/backend";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isForm = init?.body instanceof FormData;
   const res = await fetch(`${BASE}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: isForm
+      ? init?.headers
+      : { "Content-Type": "application/json", ...init?.headers },
   });
   const text = await res.text();
   let data: unknown = null;
@@ -50,6 +54,14 @@ export const api = {
     post<ProductReviewResponse>("/api/v1/product-review", body),
   patentAdvisor: (body: PatentAdvisorRequest) =>
     post<PatentAdvisorResponse>("/api/v1/patent-advisor", body),
+  extractPatentDocument: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<PatentDocumentExtractResponse>(
+      "/api/v1/patent-advisor/extract",
+      { method: "POST", body: form },
+    );
+  },
   nbaAbs: (body: NbaAbsRequest) =>
     post<NbaAbsResponse>("/api/v1/nba-abs", body),
 };

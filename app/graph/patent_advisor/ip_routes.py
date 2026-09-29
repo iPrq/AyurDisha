@@ -10,7 +10,7 @@ from graph.models import (
     RetrievedSource,
     Section3Results,
 )
-from graph.prompts import IP_ROUTES_SYSTEM, legal_scope_instruction
+from graph.prompts import IP_ROUTES_SYSTEM, document_context_block, legal_scope_instruction
 from graph.state import PatentAdvisorState
 from llm.provider import get_chat_model
 from llm.structured import format_sources_for_prompt, structured_invoke
@@ -31,6 +31,7 @@ def analyze_ip_routes(
     botanical_name: str | None = None,
     product: str | None = None,
     llm: Any | None = None,
+    document_text: str | None = None,
 ) -> IPRouteAnalysis:
     scope = _coerce_scope(legal_scope)
     model = llm if llm is not None else get_chat_model()
@@ -67,6 +68,7 @@ def analyze_ip_routes(
             section3_json,
             "Suggest Patent, Trademark, Design, Trade Secret appropriateness.",
             "Ground only in retrieved evidence + section3 findings. Not legal advice.",
+            *document_context_block(document_text),
             "Retrieved sources:",
             format_sources_for_prompt(sources),
         ]
@@ -97,6 +99,7 @@ def ip_routes_node(
         botanical_name=state.get("botanical_name"),
         product=state.get("product"),
         llm=llm,
+        document_text=state.get("document_text"),
     )
     update: dict[str, Any] = {"ip_routes": result}
     if result.insufficient_evidence:
