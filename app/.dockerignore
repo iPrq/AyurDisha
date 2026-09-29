@@ -1,0 +1,19 @@
+.venv
+.pytest_cache
+**/__pycache__
+**/*.py[oc]
+.env
+.env.*
+!.env.example
+.python-version
+Dockerfile
+.dockerignore
+
+# Ingestion-only inputs and local artifacts
+new_data
+qdrant_data
+tests
+documents/*.pdf
+documents/*.PDF
+documents/*.csv
+documents/*.json
