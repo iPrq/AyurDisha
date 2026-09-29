@@ -82,6 +82,7 @@ def state_to_response(state: dict[str, Any], request: PatentAdvisorRequest) -> P
         patentability_risk=state.get("patentability_risk"),
         prior_art=state.get("prior_art"),
         ip_routes=state.get("ip_routes"),
+        grant_likelihood=state.get("grant_likelihood"),
         verification=state.get("verification"),
         retrieved_sources=list(state.get("retrieved_sources") or []),
         final_answer=state.get("final_answer"),

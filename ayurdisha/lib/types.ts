@@ -204,6 +204,16 @@ export interface PatentAdvisorResponse extends BaseResponse {
     summary: string;
     insufficient_evidence: boolean;
   } | null;
+  grant_likelihood: {
+    probability: number | null;
+    confidence: "low" | "medium" | "high";
+    key_factors: string[];
+    rationale: string;
+    evidence_source_ids: string[];
+    insufficient_evidence: boolean;
+    label: "llm_estimated_grant_probability";
+    disclaimer: string;
+  } | null;
 }
 
 // NBA / ABS

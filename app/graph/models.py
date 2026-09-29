@@ -286,6 +286,55 @@ class IPRouteAnalysis(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Grant likelihood (LLM estimate, separate from Section 3 risk)
+# ---------------------------------------------------------------------------
+
+
+class GrantLikelihoodEstimate(BaseModel):
+    """LLM-estimated probability of patent grant — uncalibrated, not legal advice."""
+
+    probability: float | None = Field(
+        default=None,
+        description="Estimated probability (0-1) that the Indian Patent Office grants the patent",
+    )
+    confidence: Literal["low", "medium", "high"] = "low"
+    key_factors: list[str] = Field(
+        default_factory=list,
+        description="Short drivers of the estimate, e.g. '3(d) triggered with no efficacy data'",
+    )
+    rationale: str = ""
+    evidence_source_ids: list[str] = Field(default_factory=list)
+    insufficient_evidence: bool = False
+    label: Literal["llm_estimated_grant_probability"] = "llm_estimated_grant_probability"
+    disclaimer: str = (
+        "Estimated grant probability is an AI judgment, not calibrated against "
+        "Indian Patent Office outcomes, and is not legal advice."
+    )
+
+    @field_validator("probability", mode="before")
+    @classmethod
+    def _clamp_probability(cls, v: Any) -> Any:
+        if v is None:
+            return None
+        try:
+            p = float(v)
+        except (TypeError, ValueError):
+            return None
+        if p > 1.0 and p <= 100.0:
+            p = p / 100.0
+        return min(1.0, max(0.0, p))
+
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def _normalize_confidence(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            v = v.strip().lower()
+            if v in ("low", "medium", "high"):
+                return v
+        return "low"
+
+
+# ---------------------------------------------------------------------------
 # Critic verifier
 # ---------------------------------------------------------------------------
 
@@ -366,6 +415,7 @@ class PatentAdvisorResponse(BaseModel):
     patentability_risk: PatentabilityRiskIndicator | None = None
     prior_art: PriorArtResult | None = None
     ip_routes: IPRouteAnalysis | None = None
+    grant_likelihood: GrantLikelihoodEstimate | None = None
     verification: VerificationResult | None = None
     retrieved_sources: list[RetrievedSource] = Field(default_factory=list)
     final_answer: str | None = None

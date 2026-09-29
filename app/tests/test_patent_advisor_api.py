@@ -37,6 +37,10 @@ def test_patent_advisor_domestic(scripted_llm):
         assert data["section3"] is not None
         assert data["patentability_risk"] is not None
         assert data["patentability_risk"]["label"] == "decision_support_risk_indicator"
+        grant = data["grant_likelihood"]
+        assert grant is not None
+        assert grant["label"] == "llm_estimated_grant_probability"
+        assert 0.0 <= grant["probability"] <= 1.0
         assert data["retrieved_sources"]
         assert data["final_answer"]
         assert "not legal advice" in data["disclaimer"].lower()

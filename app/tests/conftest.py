@@ -16,6 +16,7 @@ from graph.models import (  # noqa: E402
     ClaimSupportStatus,
     ClaimVerification,
     EvidenceKind,
+    GrantLikelihoodEstimate,
     IPRouteAnalysis,
     IPRouteSuggestion,
     IPRouteType,
@@ -216,6 +217,14 @@ class ScriptedLLM:
                 summary="IP pathway suggestions grounded in retrieved guidance.",
                 insufficient_evidence=False,
                 legal_scope=LegalScope.DOMESTIC,
+            )
+        if name == "GrantLikelihoodEstimate":
+            return GrantLikelihoodEstimate(
+                probability=0.25,
+                confidence="medium",
+                key_factors=["3(d), 3(e) and 3(p) all triggered"],
+                rationale="Multiple Section 3 exclusions apply; grant is unlikely without efficacy data.",
+                evidence_source_ids=_prompt_source_ids(user)[:1],
             )
         if name == "VerificationResult":
             return VerificationResult(

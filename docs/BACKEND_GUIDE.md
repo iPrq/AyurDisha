@@ -33,7 +33,9 @@ Safety rules baked in:
 - Cite only retrieved evidence (`source_id`)
 - Ambiguous botanicals → do **not** silently pick; escalate
 - `legal_scope=international` with no comparative hits → `HUMAN_REVIEW_REQUIRED`
-- Patentability score is a **risk indicator**, not “probability of approval”
+- Two separate scores:
+  - `patentability_risk`: deterministic Section 3 **risk indicator** (weighted 3(d)/3(e)/3(p)), not “probability of approval”
+  - `grant_likelihood`: **LLM-estimated** grant probability (`grant_likelihood` node) with confidence, key factors and rationale — uncalibrated against Patent Office outcomes; not computed when no sources are retrieved
 
 ---
 

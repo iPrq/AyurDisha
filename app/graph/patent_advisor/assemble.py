@@ -32,6 +32,13 @@ def assemble_draft_answer(state: PatentAdvisorState) -> dict[str, Any]:
             f"Patentability risk indicator (rule-based): {risk.score:.2f}. {risk.disclaimer}"
         )
 
+    grant = state.get("grant_likelihood")
+    if grant is not None and grant.probability is not None:
+        lines.append(
+            f"Estimated grant probability (AI, uncalibrated): {grant.probability:.0%} "
+            f"(confidence: {grant.confidence}). {grant.disclaimer}"
+        )
+
     prior_art = state.get("prior_art")
     if prior_art is not None and prior_art.summary:
         lines.append(prior_art.summary)

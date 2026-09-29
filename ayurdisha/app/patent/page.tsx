@@ -189,10 +189,64 @@ function DocumentStatus({
 function Results({ r }: { r: PatentAdvisorResponse }) {
   const risk = r.patentability_risk;
   const s3 = r.section3;
+  const grant = r.grant_likelihood;
   return (
     <div className="space-y-4">
+      {grant && (
+        <Section
+          title="Estimated grant probability"
+          right={<Badge value={`${grant.confidence.toUpperCase()} CONFIDENCE`} />}
+        >
+          {grant.probability !== null ? (
+            <div className="flex items-center gap-3">
+              <span
+                className={`font-mono text-3xl font-semibold ${
+                  grant.probability >= 0.6
+                    ? "text-green-600"
+                    : grant.probability >= 0.3
+                      ? "text-amber-600"
+                      : "text-red-600"
+                }`}
+              >
+                {Math.round(grant.probability * 100)}%
+              </span>
+              <div className="h-3 flex-1 overflow-hidden rounded bg-neutral-200 dark:bg-neutral-800">
+                <div
+                  className={`h-full ${
+                    grant.probability >= 0.6
+                      ? "bg-green-600"
+                      : grant.probability >= 0.3
+                        ? "bg-amber-500"
+                        : "bg-red-500"
+                  }`}
+                  style={{ width: `${Math.round(grant.probability * 100)}%` }}
+                />
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-amber-700">
+              Not estimated — insufficient evidence.
+            </p>
+          )}
+          {grant.key_factors.length > 0 && (
+            <ul className="list-disc space-y-1 pl-5 text-sm">
+              {grant.key_factors.map((f, i) => (
+                <li key={i}>{f}</li>
+              ))}
+            </ul>
+          )}
+          {grant.rationale && (
+            <p className="text-sm">
+              {grant.rationale}
+              <SourceIds ids={grant.evidence_source_ids} />
+            </p>
+          )}
+          <p className="text-xs text-neutral-500">{grant.disclaimer}</p>
+        </Section>
+      )}
+
       {risk && (
-        <Section title="Patentability risk indicator">
+        <Section title="Section 3 risk score (rule-based)">
           <div className="flex items-center gap-3">
             <div className="h-3 flex-1 overflow-hidden rounded bg-neutral-200 dark:bg-neutral-800">
               <div

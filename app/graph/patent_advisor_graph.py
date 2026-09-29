@@ -8,6 +8,7 @@ from langgraph.graph import END, START, StateGraph
 
 from config import Settings, get_settings
 from graph.patent_advisor.assemble import assemble_draft_answer
+from graph.patent_advisor.grant_likelihood import grant_likelihood_node
 from graph.patent_advisor.ip_routes import ip_routes_node
 from graph.patent_advisor.prior_art import prior_art_node
 from graph.patent_advisor.retrieval import legal_patent_retrieval_node
@@ -47,6 +48,9 @@ def build_patent_advisor_graph(
     def _ip_routes(state: PatentAdvisorState) -> dict[str, Any]:
         return ip_routes_node(state, llm=model)
 
+    def _grant_likelihood(state: PatentAdvisorState) -> dict[str, Any]:
+        return grant_likelihood_node(state, llm=model)
+
     def _verifier(state: PatentAdvisorState) -> dict[str, Any]:
         return critic_verifier_node(state, settings=cfg, llm=model)
 
@@ -57,6 +61,7 @@ def build_patent_advisor_graph(
     graph.add_node("section3", _section3)
     graph.add_node("prior_art", _prior_art)
     graph.add_node("ip_routes", _ip_routes)
+    graph.add_node("grant_likelihood", _grant_likelihood)
     graph.add_node("assemble", assemble_draft_answer)
     graph.add_node("verifier", _verifier)
 
@@ -66,7 +71,8 @@ def build_patent_advisor_graph(
     graph.add_edge("retrieval", "section3")
     graph.add_edge("section3", "prior_art")
     graph.add_edge("prior_art", "ip_routes")
-    graph.add_edge("ip_routes", "assemble")
+    graph.add_edge("ip_routes", "grant_likelihood")
+    graph.add_edge("grant_likelihood", "assemble")
     graph.add_edge("assemble", "verifier")
     graph.add_edge("verifier", END)
 

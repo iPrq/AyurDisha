@@ -386,6 +386,57 @@ def build_lens_patents() -> dict:
     return _user_row(doc, doc_id, scope, source_dir, prov)
 
 
+def build_bhaishajya_kalpana_kosha() -> dict:
+    source_dir, stored = "bhaishajya_kalpana_kosha", "bhaishajya_kalpana_kosha.json"
+    path, prov = _verified_source(source_dir, stored)
+    
+    with path.open("r", encoding="utf-8") as fh:
+        data = json.load(fh)
+
+    doc_id = "bhaishajya_kalpana_kosha"
+    doc = OUT / f"{doc_id}.md"
+    
+    md_lines = []
+    for d in data:
+        name = d.get("name", "")
+        type_ = d.get("type", "")
+        md_lines.append(f"{name} ({type_})")
+        md_lines.append("")
+        
+        para = []
+        if d.get("category"):
+            para.append(f"Category: {d.get('category')}")
+        if d.get("main_ingredients"):
+            para.append(f"Main ingredients: {', '.join(d.get('main_ingredients'))}")
+        if d.get("ingredients"):
+            para.append(f"Ingredients: {d.get('ingredients')}")
+        if d.get("reference"):
+            para.append(f"Reference: {d.get('reference')}")
+        if d.get("indications"):
+            para.append(f"Indications: {d.get('indications')}")
+        if d.get("dosage"):
+            para.append(f"Dosage: {d.get('dosage')}")
+        if d.get("anupana"):
+            para.append(f"Anupana: {d.get('anupana')}")
+            
+        md_lines.append("\n".join(para))
+        md_lines.append("")
+    
+    text = "\n".join(md_lines).strip() + "\n"
+    doc.write_text(text, encoding="utf-8", newline="\n")
+    
+    _write_meta(
+        doc_id,
+        title="Bhaishajya Kalpana Kosha - classical Ayurvedic formulations (user-supplied dataset)",
+        source_type="prior_art",
+        source_url=None,
+    )
+    
+    print(f"[OK] {doc.name}: {len(data)} formulations")
+    scope = f"{len(data)} formulations rendered from JSON to Markdown; fields copied verbatim; duplicate records kept."
+    return _user_row(doc, doc_id, scope, source_dir, prov)
+
+
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     rows = []
@@ -431,6 +482,7 @@ def main() -> int:
         print(f"[OK] {doc.name}: {spec['scope']} ({doc.stat().st_size:,} bytes)")
     rows.append(build_hupd_patents())
     rows.append(build_lens_patents())
+    rows.append(build_bhaishajya_kalpana_kosha())
     rows.extend(build_pdf_doc(spec) for spec in PDF_DOCS)
     with (OUT / "CORPUS_PROVENANCE.csv").open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0]))

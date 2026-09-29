@@ -13,6 +13,7 @@ from graph.models import (
     AbsRateSelection,
     BotanicalResult,
     EntityType,
+    GrantLikelihoodEstimate,
     IPRouteAnalysis,
     LegalComplianceAssessment,
     LegalScope,
@@ -78,6 +79,9 @@ class PatentAdvisorState(TypedDict):
     # Prior art + IP pathways
     prior_art: NotRequired[PriorArtResult]
     ip_routes: NotRequired[IPRouteAnalysis]
+
+    # LLM grant probability estimate (separate from rule-based Section 3 risk)
+    grant_likelihood: NotRequired[GrantLikelihoodEstimate]
 
     # Critic verifier
     verification: NotRequired[VerificationResult]

@@ -83,6 +83,20 @@ Suggest whether Patent, Trademark, Design, and/or Trade Secret pathways may be a
 Explain briefly; do not guarantee registrability or enforcement outcomes.
 """
 
+GRANT_LIKELIHOOD_SYSTEM = f"""{SAFETY_PREAMBLE}
+
+Role: Grant Likelihood Estimator.
+Estimate the probability (0.0-1.0) that the Indian Patent Office would grant a patent for this invention as described.
+Weigh:
+- Novelty and overlap with the prior-art findings.
+- Inventive step (non-obviousness to a person skilled in Ayurvedic formulation).
+- Section 3 findings, especially 3(d) (new form of known substance without enhanced efficacy), 3(e) (mere admixture without synergy) and 3(p) (traditional knowledge).
+- Industrial applicability and whether the disclosure appears adequate to support claims.
+Return probability, confidence (low / medium / high), 2-6 short key_factors, a brief rationale, and evidence_source_ids.
+Lower confidence when evidence is thin, conflicting, or the botanical identity is uncertain.
+Cite only source_ids present in the retrieved sources. This is an uncalibrated estimate, not a prediction guarantee.
+"""
+
 PATENT_DOC_EXTRACT_SYSTEM = """You extract structured fields from an uploaded invention disclosure / patent draft for AyurDisha, an Ayurvedic IP decision-support tool.
 The document text may come from OCR and contain noise; correct obvious OCR errors in names only.
 Return:

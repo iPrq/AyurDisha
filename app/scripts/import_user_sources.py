@@ -157,6 +157,19 @@ SOURCES: dict[str, list[dict]] = {
             "1398 rows have no abstract. No claims or full text in the export."
         ),
     }],
+    "bhaishajya_kalpana_kosha": [{
+        "original_filename": "Bhaishajya-Kalpana-Kosha.json",
+        "stored_filename": "bhaishajya_kalpana_kosha.json",
+        "sha256": "daa460151146108a2da149ef2c6201013732d60c84a3f910cdacefe301856664",
+        "source_name": "Bhaishajya Kalpana Kosha",
+        "source_type": "formulation_reference",
+        "authority_level": "C (user-supplied compiled dataset; origin unknown; not an official pharmacopoeia)",
+        "jurisdiction": "india",
+        "document_title": "Bhaishajya Kalpana Kosha (176 formulations)",
+        "original_source_url": USER_SUPPLIED,
+        "license": "unknown - reuse terms not verified",
+        "notes": "176 records. Clean JSON structure; 74 records have main ingredient mismatches, mostly distinct from AFI/API. Unknown origin.",
+    }],
 }
 
 _FILE_KEYS = {"original_filename", "duplicates", "stored_filename", "sha256"}
