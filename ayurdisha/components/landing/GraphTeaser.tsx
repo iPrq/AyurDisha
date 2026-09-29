@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef } from "react";
-import { labelColor } from "@/components/knowledge-graph/labels";
+import { labelColor, labelIcon } from "@/components/knowledge-graph/labels";
 import { gsap, MOTION_OK, useGSAP } from "@/lib/gsap";
 import { Accent } from "./SectionHeading";
 
@@ -65,11 +65,11 @@ export function GraphTeaser() {
 
         gsap.fromTo(
           q(".kg-pulse"),
-          { scale: 1, opacity: 0.5, transformOrigin: "50% 50%" },
+          { scale: 1, opacity: 0.4, transformOrigin: "50% 50%" },
           {
-            scale: 1.9,
+            scale: 1.8,
             opacity: 0,
-            duration: 2.2,
+            duration: 2.4,
             stagger: { each: 0.4, repeat: -1 },
             ease: "power1.out",
           },
@@ -110,6 +110,13 @@ export function GraphTeaser() {
 
         <div data-reveal className="rounded-[2rem] border border-line bg-surface p-4 shadow-soft">
           <svg viewBox="0 0 520 390" className="h-auto w-full" role="img" aria-label="Example knowledge graph around Turmeric">
+            <defs>
+              <filter id="node-shadow" x="-30%" y="-30%" width="160%" height="160%">
+                <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#14261c" floodOpacity="0.12" />
+              </filter>
+            </defs>
+
+            {/* Edges */}
             {NODES.map((n) => (
               <g key={n.name}>
                 <line
@@ -119,7 +126,7 @@ export function GraphTeaser() {
                   x2={n.x}
                   y2={n.y}
                   stroke="var(--line)"
-                  strokeWidth="3"
+                  strokeWidth="2"
                 />
                 <line
                   className="kg-edge-flow"
@@ -129,22 +136,42 @@ export function GraphTeaser() {
                   y2={n.y}
                   stroke={labelColor(n.label)}
                   strokeWidth="2"
-                  strokeDasharray="6 14"
+                  strokeDasharray="4 16"
                   strokeLinecap="round"
-                  opacity="0.6"
+                  opacity="0.45"
                 />
               </g>
             ))}
 
+            {/* Satellite nodes */}
             {NODES.map((n) => (
               <g key={n.name} className="kg-node">
                 <circle className="kg-pulse" cx={n.x} cy={n.y} r="16" fill={labelColor(n.label)} />
-                <circle cx={n.x} cy={n.y} r="16" fill={labelColor(n.label)} stroke="#14261C" strokeWidth="2.5" />
+                <circle
+                  cx={n.x}
+                  cy={n.y}
+                  r="16"
+                  fill={labelColor(n.label)}
+                  stroke="var(--surface)"
+                  strokeWidth="2.5"
+                  style={{ filter: "url(#node-shadow)" }}
+                />
+                {/* Icon */}
                 <text
                   x={n.x}
-                  y={n.y + 34}
+                  y={n.y + 4}
                   textAnchor="middle"
-                  fontSize="14"
+                  fontSize="10"
+                  fill="rgba(255,255,255,0.85)"
+                >
+                  {labelIcon(n.label)}
+                </text>
+                {/* Name */}
+                <text
+                  x={n.x}
+                  y={n.y + 32}
+                  textAnchor="middle"
+                  fontSize="13"
                   fontWeight="600"
                   fill="var(--ink)"
                 >
@@ -153,14 +180,24 @@ export function GraphTeaser() {
               </g>
             ))}
 
+            {/* Center node */}
             <g className="kg-center">
-              <circle cx={CENTER.x} cy={CENTER.y} r="38" fill={labelColor("Herb")} stroke="#14261C" strokeWidth="3" />
+              <circle cx={CENTER.x} cy={CENTER.y} r="42" fill="none" stroke={labelColor("Herb")} strokeWidth="1" opacity="0.3" />
+              <circle
+                cx={CENTER.x}
+                cy={CENTER.y}
+                r="36"
+                fill={labelColor("Herb")}
+                stroke="var(--surface)"
+                strokeWidth="3"
+                style={{ filter: "url(#node-shadow)" }}
+              />
               <text
                 x={CENTER.x}
                 y={CENTER.y + 5}
                 textAnchor="middle"
                 fontSize="15"
-                fontWeight="800"
+                fontWeight="700"
                 fill="#fff"
               >
                 Turmeric

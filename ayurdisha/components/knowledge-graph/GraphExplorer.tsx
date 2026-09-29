@@ -15,7 +15,7 @@ const HIDDEN_PROPS = new Set(["origin", "snippet", "url", "source_id", "ident"])
 
 function CanvasMessage({ text }: { text: string }) {
   return (
-    <div className="flex h-full items-center justify-center p-6 text-center text-sm text-neutral-500">
+    <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted">
       {text}
     </div>
   );
@@ -24,7 +24,7 @@ function CanvasMessage({ text }: { text: string }) {
 function LabelDot({ label }: { label: string }) {
   return (
     <span
-      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+      className="inline-block h-2 w-2 shrink-0 rounded-full"
       style={{ backgroundColor: labelColor(label) }}
     />
   );
@@ -106,48 +106,63 @@ export function GraphExplorer({ query }: { query: string }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-200 px-4 py-2 text-sm dark:border-neutral-800">
+      {/* ── TOOLBAR ────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2 text-sm">
         {history.length > 1 && (
           <button
             type="button"
             onClick={() => setHistory((h) => h.slice(0, -1))}
-            className="rounded px-2 py-1 text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+            className="rounded px-2 py-1 text-muted hover:bg-mint hover:text-ink transition-colors"
           >
             ← Back
           </button>
         )}
+
         {center && (
           <span className="flex items-center gap-2 font-medium">
             <LabelDot label={center.label} />
             {center.name}
-            <span className="text-xs font-normal text-neutral-500">
+            <span className="text-xs text-muted">
               {LABELS[center.label]?.title ?? center.label}
             </span>
           </span>
         )}
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-xs text-neutral-500">Hops</span>
-          <div className="inline-flex rounded border border-neutral-300 p-0.5 dark:border-neutral-700">
-            {[1, 2].map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setDepth(d)}
-                className={`rounded px-2.5 py-0.5 text-xs font-medium ${
-                  depth === d
-                    ? "bg-green-700 text-white"
-                    : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
-                }`}
-              >
-                {d}
-              </button>
-            ))}
+
+        <div className="ml-auto flex items-center gap-3">
+          {/* Stats */}
+          {graph && (
+            <span className="hidden sm:inline text-xs text-muted tabular-nums">
+              {graph.nodes.length} nodes · {graph.edges.length} edges
+            </span>
+          )}
+
+          {/* Hops */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted">Depth</span>
+            <div className="inline-flex rounded-md border border-line p-0.5">
+              {[1, 2].map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setDepth(d)}
+                  className={`rounded px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                    depth === d
+                      ? "bg-leaf text-white"
+                      : "text-muted hover:bg-mint hover:text-ink"
+                  }`}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
+      {/* ── MAIN ───────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <div className="relative min-h-[320px] flex-1 bg-neutral-50 dark:bg-neutral-950">
+        {/* Canvas */}
+        <div className="relative min-h-[320px] flex-1 bg-neutral-50">
           {error ? (
             <CanvasMessage text={error} />
           ) : graph ? (
@@ -159,20 +174,24 @@ export function GraphExplorer({ query }: { query: string }) {
           ) : (
             <CanvasMessage text="Loading graph…" />
           )}
+
           {loading && graph && (
-            <span className="absolute left-3 top-3 rounded bg-white/80 px-2 py-0.5 text-xs text-neutral-500 dark:bg-neutral-900/80">
+            <span className="absolute left-3 top-3 rounded bg-white/80 px-2 py-0.5 text-xs text-muted">
               Loading…
             </span>
           )}
+
           {graph?.truncated && (
-            <span className="absolute right-3 top-3 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-900">
+            <span className="absolute right-3 top-3 rounded bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs text-amber-800">
               Showing first {graph.nodes.length} nodes
             </span>
           )}
+
+          {/* Legend */}
           {presentLabels.length > 0 && (
-            <div className="absolute bottom-2 left-2 flex max-w-[95%] flex-wrap gap-x-3 gap-y-1 rounded bg-white/85 px-2 py-1 text-xs text-neutral-600 dark:bg-neutral-900/85 dark:text-neutral-300">
+            <div className="absolute bottom-2 left-2 flex max-w-[95%] flex-wrap gap-x-3 gap-y-1 rounded-lg bg-white/90 px-2.5 py-1.5 text-[11px] text-muted border border-line/50">
               {presentLabels.map((l) => (
-                <span key={l} className="flex items-center gap-1">
+                <span key={l} className="flex items-center gap-1.5">
                   <LabelDot label={l} />
                   {LABELS[l]?.title ?? l}
                 </span>
@@ -181,43 +200,51 @@ export function GraphExplorer({ query }: { query: string }) {
           )}
         </div>
 
+        {/* ── SIDEBAR ──────────────────────────────── */}
         {selected && (
-          <aside className="max-h-[40vh] w-full shrink-0 space-y-3 overflow-y-auto border-t border-neutral-200 p-4 text-sm md:max-h-none md:w-80 md:border-l md:border-t-0 dark:border-neutral-800">
+          <aside className="max-h-[40vh] w-full shrink-0 space-y-4 overflow-y-auto border-t border-line p-4 text-sm md:max-h-none md:w-80 md:border-l md:border-t-0">
+            {/* Mobile drag handle */}
+            <div className="mx-auto h-1 w-10 rounded-full bg-line md:hidden" />
+
+            {/* Header */}
             <div className="space-y-1">
-              <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-neutral-500">
+              <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted">
                 <LabelDot label={selected.label} />
                 {LABELS[selected.label]?.title ?? selected.label}
               </div>
-              <h3 className="font-semibold leading-snug">{selected.name}</h3>
+              <h3 className="text-lg font-semibold leading-snug">{selected.name}</h3>
               {selected.aliases.length > 0 && (
-                <p className="text-xs text-neutral-500">
+                <p className="text-xs text-muted">
                   Also: {selected.aliases.filter((a) => a !== selected.name).join(", ")}
                 </p>
               )}
             </div>
 
+            {/* Action */}
             {selected.key !== graph?.center && (
               <button
                 type="button"
                 onClick={() => explore(selected)}
-                className="rounded bg-green-700 px-3 py-1 text-xs font-medium text-white hover:bg-green-800"
+                className="rounded-lg bg-leaf px-3 py-1.5 text-xs font-medium text-white hover:bg-green-800 transition-colors"
               >
                 Explore from here
               </button>
             )}
 
+            {/* Snippet */}
             {typeof selected.props.snippet === "string" && (
-              <p className="whitespace-pre-wrap rounded bg-neutral-100 p-2 text-xs text-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
+              <p className="whitespace-pre-wrap rounded-lg bg-mint/40 p-3 text-xs leading-relaxed text-ink/80">
                 {selected.props.snippet}
               </p>
             )}
 
-            <dl className="space-y-1 text-xs">
+            {/* Properties */}
+            <dl className="space-y-1.5 text-xs">
               {Object.entries(selected.props)
                 .filter(([k, v]) => !HIDDEN_PROPS.has(k) && v !== null && v !== "")
                 .map(([k, v]) => (
                   <div key={k} className="flex gap-2">
-                    <dt className="w-28 shrink-0 capitalize text-neutral-500">
+                    <dt className="w-28 shrink-0 capitalize text-muted">
                       {k.replaceAll("_", " ")}
                     </dt>
                     <dd className="min-w-0 break-words">{formatValue(v)}</dd>
@@ -225,7 +252,7 @@ export function GraphExplorer({ query }: { query: string }) {
                 ))}
               {typeof selected.props.origin === "string" && (
                 <div className="flex gap-2">
-                  <dt className="w-28 shrink-0 text-neutral-500">Provenance</dt>
+                  <dt className="w-28 shrink-0 text-muted">Provenance</dt>
                   <dd>{selected.props.origin}</dd>
                 </div>
               )}
@@ -236,15 +263,16 @@ export function GraphExplorer({ query }: { query: string }) {
                 href={selected.props.url}
                 target="_blank"
                 rel="noreferrer"
-                className="block text-xs text-green-700 underline dark:text-green-400"
+                className="inline-block text-xs text-leaf underline underline-offset-2 hover:text-green-800 transition-colors"
               >
                 Open source ↗
               </a>
             )}
 
+            {/* Connections */}
             {connections.length > 0 && (
-              <div className="space-y-1">
-                <h4 className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+              <div className="space-y-1.5">
+                <h4 className="text-xs font-medium uppercase tracking-wide text-muted">
                   Connections ({connections.length})
                 </h4>
                 <ul className="space-y-0.5">
@@ -253,11 +281,11 @@ export function GraphExplorer({ query }: { query: string }) {
                       <button
                         type="button"
                         onClick={() => setSelectedKey(other.key)}
-                        className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                        className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-xs hover:bg-mint transition-colors"
                       >
                         <LabelDot label={other.label} />
                         <span className="min-w-0 flex-1 truncate">{other.name}</span>
-                        <span className="shrink-0 text-neutral-400">
+                        <span className="shrink-0 text-muted">
                           {relationText(edge.type, outgoing)}
                         </span>
                       </button>

@@ -1,6 +1,10 @@
 import type { NextRequest } from "next/server";
 
-const BACKEND_URL = process.env.AYURDISHA_API_URL ?? "http://127.0.0.1:8000";
+const BACKEND_URL =
+  process.env.AYURDISHA_API_URL ||
+  (process.env.NODE_ENV === "production"
+    ? "https://ayurdisha.onrender.com"
+    : "http://127.0.0.1:8000");
 
 export const maxDuration = 300;
 

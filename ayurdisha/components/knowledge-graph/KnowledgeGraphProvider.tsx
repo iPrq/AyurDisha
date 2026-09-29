@@ -64,22 +64,22 @@ export function KnowledgeGraphProvider({ children }: { children: React.ReactNode
       {children}
       {query && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-2 sm:p-6"
           onClick={() => setQuery(null)}
         >
           <div
             role="dialog"
             aria-modal="true"
             aria-label={`Knowledge graph: ${query}`}
-            className="flex h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white shadow-xl dark:bg-neutral-900"
+            className="flex h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-surface shadow-2xl border border-line"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
+            <div className="flex items-center justify-between border-b border-line px-4 py-2">
               <h2 className="text-sm font-semibold">Knowledge graph</h2>
               <button
                 type="button"
                 onClick={() => setQuery(null)}
-                className="rounded px-2 text-lg leading-none text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                className="rounded px-2 text-lg leading-none text-muted hover:bg-mint hover:text-ink transition-colors"
                 aria-label="Close"
               >
                 ×
@@ -112,21 +112,27 @@ export function EntityLink({
 }) {
   const kg = useKnowledgeGraph();
   if (!kg) return <>{children ?? term}</>;
-  const color = labelColor(label ?? kg.terms.get(term.toLowerCase()) ?? "Herb");
+  const entityLabel = label ?? kg.terms.get(term.toLowerCase()) ?? "Herb";
+  const color = labelColor(entityLabel);
   return (
-    <button
-      type="button"
-      title={`Show "${term}" in the knowledge graph`}
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        kg.open(term);
-      }}
-      className={`cursor-pointer underline decoration-dotted decoration-2 underline-offset-2 hover:decoration-solid ${className}`}
-      style={{ textDecorationColor: color }}
-    >
-      {children ?? term}
-    </button>
+    <span className="group relative">
+      <button
+        type="button"
+        title={`Show "${term}" in the knowledge graph`}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          kg.open(term);
+        }}
+        className={`cursor-pointer underline decoration-dotted decoration-2 underline-offset-2 hover:decoration-solid hover:opacity-80 transition-opacity ${className}`}
+        style={{ textDecorationColor: color }}
+      >
+        {children ?? term}
+      </button>
+      <span className="pointer-events-none absolute bottom-full left-1/2 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-ink/90 px-2 py-1 text-xs text-surface opacity-0 transition-opacity group-hover:opacity-100 z-10 shadow-lg">
+        {entityLabel}
+      </span>
+    </span>
   );
 }
 
