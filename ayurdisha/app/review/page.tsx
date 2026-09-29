@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import {
+  botanicalTerms,
+  EntityLink,
+} from "@/components/knowledge-graph/KnowledgeGraphProvider";
 import type {
   DimensionRating,
   LegalScope,
@@ -16,15 +20,22 @@ import {
   FinalAnswer,
   FindingList,
   IngredientInput,
-  LegalScopeSelect,
   PdfUpload,
   Section,
   SourceIds,
+  SourceScopeToggle,
   Sources,
   SubmitButton,
   Verification,
   inputClass,
 } from "@/components/ui";
+
+const SOURCE_DESCRIPTIONS: Record<LegalScope, string> = {
+  domestic:
+    "Cites AYUSH, CDSCO, FSSAI and India Code for regulation, with Indian market and cultivation results.",
+  international:
+    "Cites WHO, FDA, EMA, EFSA, MHRA, TGA and Health Canada for regulation, with global market and IUCN / CITES results.",
+};
 
 export default function ProductReviewPage() {
   const [product, setProduct] = useState("");
@@ -96,7 +107,12 @@ export default function ProductReviewPage() {
         <Field label="Ingredients">
           <IngredientInput value={ingredients} onChange={setIngredients} />
         </Field>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <SourceScopeToggle
+          value={legalScope}
+          onChange={setLegalScope}
+          descriptions={SOURCE_DESCRIPTIONS}
+        />
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Product category" hint="Optional">
             <input
               className={inputClass}
@@ -105,15 +121,15 @@ export default function ProductReviewPage() {
               placeholder="e.g. health supplement"
             />
           </Field>
-          <Field label="Target market" hint="Optional, defaults to India">
+          <Field
+            label="Target market"
+            hint={`Optional, defaults to ${legalScope === "international" ? "global" : "India"}`}
+          >
             <input
               className={inputClass}
               value={targetMarket}
               onChange={(e) => setTargetMarket(e.target.value)}
             />
-          </Field>
-          <Field label="Legal scope">
-            <LegalScopeSelect value={legalScope} onChange={setLegalScope} />
           </Field>
         </div>
         <Field label="Question" hint="Optional">
@@ -209,7 +225,13 @@ function Results({ r }: { r: ProductReviewResponse }) {
             <ul className="space-y-2 text-sm">
               {res.resources.map((x, i) => (
                 <li key={i}>
-                  <span className="font-medium">{x.ingredient}</span>
+                  <EntityLink
+                    term={x.botanical_name ?? x.ingredient}
+                    label="Herb"
+                    className="font-medium"
+                  >
+                    {x.ingredient}
+                  </EntityLink>
                   {x.botanical_name && <em> ({x.botanical_name})</em>}
                   <SourceIds ids={x.evidence_source_ids} />
                   <div className="text-neutral-600 dark:text-neutral-400">
@@ -231,9 +253,13 @@ function Results({ r }: { r: ProductReviewResponse }) {
       )}
 
       <Botanicals items={r.botanicals} />
-      <FinalAnswer answer={r.final_answer} disclaimer={r.disclaimer} />
+      <FinalAnswer
+        answer={r.final_answer}
+        disclaimer={r.disclaimer}
+        terms={botanicalTerms(r.botanicals)}
+      />
       <Verification v={r.verification} />
-      <Sources items={r.retrieved_sources} />
+      <Sources items={r.retrieved_sources} terms={botanicalTerms(r.botanicals)} />
     </div>
   );
 }

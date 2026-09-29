@@ -16,6 +16,7 @@ from graph.prompts import PRODUCT_DOCUMENT_CONTEXT_HEADER
 from tests.conftest import ScriptedLLM
 from retrieval.mock import MockLegalRetriever, get_fixture_corpus
 from websearch.base import NullWebSearcher, WebSearchError
+from websearch.domains import INDIA_REGULATOR_DOMAINS, INTERNATIONAL_REGULATOR_DOMAINS
 from websearch.mock import MockWebSearcher
 
 _REQUEST = {
@@ -129,6 +130,34 @@ def test_product_review_international_without_corpus_never_invents_law(scripted_
     assert legal.rating == DimensionRating.INSUFFICIENT_EVIDENCE
     assert "insufficient_international_evidence" in result["escalation_reasons"]
     assert result["verification_status"] == VerificationOutcome.HUMAN_REVIEW_REQUIRED.value
+
+
+class _RecordingSearcher:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def search(self, query, *, num_results=5, include_domains=None, country=None):
+        self.calls.append(
+            {"query": query, "include_domains": include_domains, "country": country}
+        )
+        return []
+
+
+def test_product_review_scope_switches_web_sources(scripted_llm):
+    domestic = _RecordingSearcher()
+    build_product_review_graph(llm=scripted_llm, searcher=domestic).invoke(dict(_REQUEST))
+    assert all(c["country"] is None for c in domestic.calls)
+    assert any(c["include_domains"] == INDIA_REGULATOR_DOMAINS for c in domestic.calls)
+    assert any("india" in c["query"].lower() for c in domestic.calls)
+
+    intl = _RecordingSearcher()
+    build_product_review_graph(llm=scripted_llm, searcher=intl).invoke(
+        {**_REQUEST, "legal_scope": "international"}
+    )
+    assert all(c["country"] == "" for c in intl.calls)
+    assert any(c["include_domains"] == INTERNATIONAL_REGULATOR_DOMAINS for c in intl.calls)
+    assert not any("india" in c["query"].lower() for c in intl.calls)
+    assert any("global" in c["query"] for c in intl.calls)
 
 
 def test_product_review_international_uses_comparative_regulation(scripted_llm):

@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 import api.patent_advisor as patent_api
 from graph.patent_advisor_graph import build_patent_advisor_graph
 from main import app
+from websearch.mock import MockWebSearcher
 
 client = TestClient(app)
 
@@ -18,7 +19,9 @@ def test_health():
 
 
 def test_patent_advisor_domestic(scripted_llm):
-    patent_api._graph = build_patent_advisor_graph(llm=scripted_llm)
+    patent_api._graph = build_patent_advisor_graph(
+        llm=scripted_llm, searcher=MockWebSearcher()
+    )
     try:
         resp = client.post(
             "/api/v1/patent-advisor",
@@ -49,7 +52,9 @@ def test_patent_advisor_domestic(scripted_llm):
 
 
 def test_patent_advisor_international(scripted_llm):
-    patent_api._graph = build_patent_advisor_graph(llm=scripted_llm)
+    patent_api._graph = build_patent_advisor_graph(
+        llm=scripted_llm, searcher=MockWebSearcher()
+    )
     try:
         resp = client.post(
             "/api/v1/patent-advisor",

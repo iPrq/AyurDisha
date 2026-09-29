@@ -9,6 +9,8 @@ from graph.models import SUPPORTED_SECTION3_CLAUSES, LegalScope, RetrievedSource
 from graph.state import PatentAdvisorState
 from retrieval.base import LegalRetriever
 from retrieval.mock import get_mock_retriever
+from websearch.base import NO_COUNTRY_BIAS, WebSearcher, search_many
+from websearch.domains import INTERNATIONAL_IP_DOMAINS
 
 # Keeps product-regulation / ABS chunks out of patent reasoning.
 PATENT_SOURCE_TYPES = [
@@ -55,11 +57,17 @@ def _build_section3_statute_query(state: PatentAdvisorState) -> str:
     return " ".join(parts)
 
 
-def _wants_section3_statutes(jurisdiction: str, legal_scope: LegalScope | str) -> bool:
-    scope_val = (
+def _scope_value(legal_scope: LegalScope | str) -> str:
+    return (
         legal_scope.value if isinstance(legal_scope, LegalScope) else str(legal_scope)
     ).lower()
-    return scope_val == LegalScope.DOMESTIC.value and jurisdiction.strip().lower() == "india"
+
+
+def _wants_section3_statutes(jurisdiction: str, legal_scope: LegalScope | str) -> bool:
+    return (
+        _scope_value(legal_scope) == LegalScope.DOMESTIC.value
+        and jurisdiction.strip().lower() == "india"
+    )
 
 
 def _merge_sources(
@@ -75,10 +83,20 @@ def _merge_sources(
     return merged
 
 
+def _build_ip_web_query(state: PatentAdvisorState) -> str:
+    parts = [
+        str(state.get("botanical_name") or state.get("product") or ""),
+        *(str(i) for i in (state.get("ingredients") or [])[:3]),
+        "herbal composition patent",
+    ]
+    return " ".join(p for p in parts if p)
+
+
 def legal_patent_retrieval_node(
     state: PatentAdvisorState,
     *,
     retriever: LegalRetriever | None = None,
+    searcher: WebSearcher | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     client = retriever or get_mock_retriever()
@@ -91,6 +109,20 @@ def legal_patent_retrieval_node(
         legal_scope=legal_scope,
         source_types=PATENT_SOURCE_TYPES,
     )
+
+    # The international corpus is thin; supplement it with IP-office web evidence.
+    web_errors: list[str] = []
+    if searcher is not None and _scope_value(legal_scope) == LegalScope.INTERNATIONAL.value:
+        cfg = settings or get_settings()
+        web_hits, web_errors = search_many(
+            searcher,
+            [_build_ip_web_query(state)],
+            num_results=cfg.web_search_results,
+            include_domains=INTERNATIONAL_IP_DOMAINS,
+            legal_scope=LegalScope.INTERNATIONAL,
+            country=NO_COUNTRY_BIAS,
+        )
+        sources = _merge_sources(sources, web_hits)
 
     # Focused statute retrieval so Section 3 reliably sees the clause chunks.
     # Same retriever (Qdrant + BM25 + RRF [+ rerank]) and filters; domestic India only.
@@ -121,11 +153,11 @@ def legal_patent_retrieval_node(
     }
 
     reasons = list(state.get("escalation_reasons") or [])
-    scope_val = (
-        legal_scope.value if isinstance(legal_scope, LegalScope) else str(legal_scope)
-    )
+    if web_errors and "web_search_failed" not in reasons:
+        reasons.append("web_search_failed")
+        update["escalation_reasons"] = reasons
     if len(sources) == 0:
-        if scope_val == LegalScope.INTERNATIONAL.value:
+        if _scope_value(legal_scope) == LegalScope.INTERNATIONAL.value:
             if "insufficient_international_evidence" not in reasons:
                 reasons.append("insufficient_international_evidence")
             update["verification_status"] = "HUMAN_REVIEW_REQUIRED"
@@ -138,9 +170,14 @@ def legal_patent_retrieval_node(
 
 
 def make_retrieval_node(
-    *, retriever: LegalRetriever | None = None, settings: Settings | None = None
+    *,
+    retriever: LegalRetriever | None = None,
+    searcher: WebSearcher | None = None,
+    settings: Settings | None = None,
 ):
     def _node(state: PatentAdvisorState) -> dict[str, Any]:
-        return legal_patent_retrieval_node(state, retriever=retriever, settings=settings)
+        return legal_patent_retrieval_node(
+            state, retriever=retriever, searcher=searcher, settings=settings
+        )
 
     return _node

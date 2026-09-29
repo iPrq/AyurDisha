@@ -8,11 +8,15 @@ from config import Settings, get_settings
 from graph.models import ResourceAccessibilityAssessment, RetrievedSource
 from graph.product_review.common import (
     botanical_context,
+    coerce_scope,
     filter_ids,
     finalize_rating,
+    is_international,
     product_document_context,
     resource_names,
     sanitize_findings,
+    search_country,
+    sourcing_region,
 )
 from graph.prompts import RESOURCE_ACCESSIBILITY_SYSTEM
 from llm.provider import get_chat_model
@@ -21,11 +25,16 @@ from websearch.base import WebSearcher, search_many
 
 
 def build_resource_queries(state: dict[str, Any], limit: int) -> list[str]:
-    region = (state.get("jurisdiction") or "india").strip()
+    region = sourcing_region(state)
+    conservation = (
+        "IUCN Red List CITES trade" if is_international(state) else f"{region} NMPB"
+    )
     queries: list[str] = []
     for name in resource_names(state, limit=limit):
         queries.append(f"{name} cultivation availability supply {region}")
-        queries.append(f"{name} conservation status wild harvest sustainability")
+        queries.append(
+            f"{name} conservation status wild harvest sustainability {conservation}"
+        )
     return queries
 
 
@@ -44,7 +53,7 @@ def assess_resource_accessibility(
     user = "\n".join(
         [
             f"product={state.get('product') or ''}",
-            f"sourcing_region={state.get('jurisdiction') or 'india'}",
+            f"sourcing_region={sourcing_region(state)}",
             "Required medicinal plants (botanical normalization):",
             botanical_context(state),
             "Assess availability, cultivation/supply, geography and sustainability per plant "
@@ -89,7 +98,9 @@ def resource_accessibility_node(
         searcher,
         build_resource_queries(state, cfg.product_review_max_resources),
         num_results=cfg.web_search_results,
-        jurisdiction=(state.get("jurisdiction") or "india").lower(),
+        jurisdiction=sourcing_region(state).lower(),
+        legal_scope=coerce_scope(state.get("legal_scope")),
+        country=search_country(state),
     )
     assessment = assess_resource_accessibility(state, sources, llm=model)
 

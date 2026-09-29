@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, UploadFile
 
 from api.pdf_upload import llm_http_error, read_pdf_upload
 from config import get_settings
@@ -20,6 +20,7 @@ from graph.models import (
 from graph.patent_advisor_graph import build_patent_advisor_graph
 from graph.prompts import PATENT_DOC_EXTRACT_SYSTEM
 from knowledge_graph.factory import get_knowledge_graph
+from knowledge_graph.service import record_response
 from llm.provider import get_chat_model
 from llm.structured import structured_invoke
 from retrieval.factory import get_retriever
@@ -78,7 +79,9 @@ def state_to_response(state: dict[str, Any], request: PatentAdvisorRequest) -> P
 
 
 @router.post("/patent-advisor", response_model=PatentAdvisorResponse)
-def patent_advisor(request: PatentAdvisorRequest) -> PatentAdvisorResponse:
+def patent_advisor(
+    request: PatentAdvisorRequest, background_tasks: BackgroundTasks
+) -> PatentAdvisorResponse:
     """Run Section 3 & Patent Advisor workflow (decision support, not legal advice)."""
     try:
         initial = {
@@ -94,7 +97,9 @@ def patent_advisor(request: PatentAdvisorRequest) -> PatentAdvisorResponse:
             initial["document_text"] = request.document_text
 
         result = get_graph().invoke(initial)
-        return state_to_response(result, request)
+        response = state_to_response(result, request)
+        background_tasks.add_task(record_response, response, feature="patent_advisor")
+        return response
     except Exception as exc:  # noqa: BLE001
         logger.exception("patent-advisor failed for product=%r", request.product)
         raise llm_http_error(exc) from exc

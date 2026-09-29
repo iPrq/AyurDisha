@@ -5,10 +5,12 @@ from __future__ import annotations
 from graph.models import BotanicalStatus, LegalScope, VerificationOutcome
 from graph.patent_advisor_graph import build_patent_advisor_graph
 from retrieval.mock import MockLegalRetriever, get_fixture_corpus
+from websearch.base import WebSearchResult
+from websearch.mock import MockWebSearcher
 
 
 def test_patent_advisor_domestic_ashwagandha(scripted_llm):
-    graph = build_patent_advisor_graph(llm=scripted_llm)
+    graph = build_patent_advisor_graph(llm=scripted_llm, searcher=MockWebSearcher())
     result = graph.invoke(
         {
             "product": "Ashwagandha capsule",
@@ -31,7 +33,7 @@ def test_patent_advisor_domestic_ashwagandha(scripted_llm):
 
 
 def test_patent_advisor_ambiguous_escalates(scripted_llm):
-    graph = build_patent_advisor_graph(llm=scripted_llm)
+    graph = build_patent_advisor_graph(llm=scripted_llm, searcher=MockWebSearcher())
     result = graph.invoke(
         {
             "product": "Ginseng tonic",
@@ -47,7 +49,7 @@ def test_patent_advisor_ambiguous_escalates(scripted_llm):
 
 
 def test_patent_advisor_international_uses_comparative_sources(scripted_llm):
-    graph = build_patent_advisor_graph(llm=scripted_llm)
+    graph = build_patent_advisor_graph(llm=scripted_llm, searcher=MockWebSearcher())
     result = graph.invoke(
         {
             "product": "Ashwagandha capsule",
@@ -62,12 +64,37 @@ def test_patent_advisor_international_uses_comparative_sources(scripted_llm):
     assert all(s.legal_scope == LegalScope.INTERNATIONAL for s in sources)
 
 
+def test_patent_advisor_international_adds_ip_office_web_sources(scripted_llm):
+    hit = WebSearchResult(
+        title="WIPO herbal composition", url="https://patentscope.wipo.int/x", snippet="s"
+    )
+    searcher = MockWebSearcher(fixtures=[({"patent"}, hit)])
+    graph = build_patent_advisor_graph(llm=scripted_llm, searcher=searcher)
+    request = {
+        "product": "Ashwagandha capsule",
+        "ingredients": ["Ashwagandha"],
+        "language": "en",
+        "jurisdiction": "india",
+    }
+
+    intl = graph.invoke({**request, "legal_scope": LegalScope.INTERNATIONAL})
+    web = [s for s in intl["retrieved_sources"] if s.source_type == "web"]
+    assert [s.source_url for s in web] == ["https://patentscope.wipo.int/x"]
+    assert web[0].legal_scope == LegalScope.INTERNATIONAL
+
+    searcher.queries.clear()
+    domestic = graph.invoke({**request, "legal_scope": LegalScope.DOMESTIC})
+    assert searcher.queries == []
+    assert not any(s.source_type == "web" for s in domestic["retrieved_sources"])
+
+
 def test_patent_advisor_international_empty_corpus_human_review(scripted_llm):
     domestic_only = [
         s for s in get_fixture_corpus() if s.legal_scope == LegalScope.DOMESTIC
     ]
     graph = build_patent_advisor_graph(
         retriever=MockLegalRetriever(corpus=domestic_only),
+        searcher=MockWebSearcher(),
         llm=scripted_llm,
     )
     result = graph.invoke(

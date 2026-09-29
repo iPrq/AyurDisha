@@ -279,3 +279,33 @@ export interface NbaAbsResponse extends BaseResponse {
     source_id: string | null;
   } | null;
 }
+
+export type KgPropValue = string | number | boolean | string[] | null;
+
+export interface KgNode {
+  key: string;
+  label: string;
+  name: string;
+  aliases: string[];
+  props: Record<string, KgPropValue>;
+}
+
+export interface KgEdge {
+  source: string;
+  target: string;
+  type: string;
+  props: Record<string, KgPropValue>;
+}
+
+export interface KgGraph {
+  center: string | null;
+  nodes: KgNode[];
+  edges: KgEdge[];
+  truncated: boolean;
+}
+
+export interface KgTerm {
+  term: string;
+  key: string;
+  label: string;
+}

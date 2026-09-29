@@ -1,0 +1,2 @@
+source_id,source_name,source_url,source_type,authority_level,jurisdiction,retrieval_date_utc,original_filename,stored_filename,document_title,original_source_url,upstream_revision,license,sha256,bytes,notes
+us_turmeric_patent,US Patent 5401504A,user-supplied file (app/new_data); download URL not recorded,patent,A,us,2026-09-29,US5401504.pdf,us5401504.pdf,US5401504A - USE OF TURMERIC IN WOUND HEALING,user-supplied file (app/new_data); download URL not recorded,,Public record,0cafeb24c9ce37876cd62859bf982a864f1d40898fc24e58c92df54ab1098711,669069,US Turmeric patent

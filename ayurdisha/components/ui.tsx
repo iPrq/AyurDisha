@@ -1,9 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
+import {
+  EntityLink,
+  LinkifiedText,
+} from "@/components/knowledge-graph/KnowledgeGraphProvider";
 import type {
   BotanicalResult,
   DocumentExtractResponse,
+  LegalScope,
   RetrievedSource,
   ReviewFinding,
   VerificationResult,
@@ -85,22 +90,49 @@ export function IngredientInput({
   );
 }
 
-export function LegalScopeSelect({
+const SCOPE_LABELS: Record<LegalScope, string> = {
+  domestic: "Indian",
+  international: "International",
+};
+
+export function SourceScopeToggle({
   value,
   onChange,
+  descriptions,
 }: {
-  value: string;
-  onChange: (v: "domestic" | "international") => void;
+  value: LegalScope;
+  onChange: (v: LegalScope) => void;
+  descriptions: Record<LegalScope, string>;
 }) {
   return (
-    <select
-      className={inputClass}
-      value={value}
-      onChange={(e) => onChange(e.target.value as "domestic" | "international")}
-    >
-      <option value="domestic">Domestic (India)</option>
-      <option value="international">International / comparative</option>
-    </select>
+    <div className="space-y-1">
+      <span className="block text-sm font-medium">Sources</span>
+      <div
+        role="radiogroup"
+        aria-label="Sources"
+        className="inline-flex rounded border border-neutral-300 p-0.5 dark:border-neutral-700"
+      >
+        {(Object.keys(SCOPE_LABELS) as LegalScope[]).map((scope) => (
+          <button
+            key={scope}
+            type="button"
+            role="radio"
+            aria-checked={value === scope}
+            onClick={() => onChange(scope)}
+            className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${
+              value === scope
+                ? "bg-green-700 text-white"
+                : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+            }`}
+          >
+            {SCOPE_LABELS[scope]}
+          </button>
+        ))}
+      </div>
+      <span className="block text-xs text-neutral-500">
+        {descriptions[value]}
+      </span>
+    </div>
   );
 }
 
@@ -224,7 +256,13 @@ export function Botanicals({ items }: { items: BotanicalResult[] }) {
         {items.map((b, i) => (
           <li key={i} className="space-y-0.5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">{b.input_term}</span>
+              <EntityLink
+                term={b.botanical_name ?? b.input_term}
+                label="Herb"
+                className="font-medium"
+              >
+                {b.input_term}
+              </EntityLink>
               {b.botanical_name && (
                 <em className="text-neutral-600 dark:text-neutral-400">
                   {b.botanical_name}
@@ -240,7 +278,12 @@ export function Botanicals({ items }: { items: BotanicalResult[] }) {
             {b.candidates.length > 0 && (
               <div className="text-xs text-neutral-600 dark:text-neutral-400">
                 Candidates:{" "}
-                {b.candidates.map((c) => c.botanical_name).join(", ")}
+                {b.candidates.map((c, j) => (
+                  <span key={c.botanical_name}>
+                    {j > 0 && ", "}
+                    <EntityLink term={c.botanical_name} label="Herb" />
+                  </span>
+                ))}
               </div>
             )}
             {b.notes && (
@@ -295,10 +338,23 @@ export function Verification({ v }: { v: VerificationResult | null }) {
   );
 }
 
-export function Sources({ items }: { items: RetrievedSource[] }) {
+export function Sources({
+  items,
+  terms,
+}: {
+  items: RetrievedSource[];
+  terms?: string[];
+}) {
   if (!items.length) return null;
   return (
-    <Section title={`Sources (${items.length})`}>
+    <Section
+      title={`Sources (${items.length})`}
+      right={
+        <span className="text-xs text-neutral-500">
+          Click an underlined name to open its knowledge graph
+        </span>
+      }
+    >
       <ul className="space-y-2">
         {items.map((s) => (
           <li
@@ -315,12 +371,23 @@ export function Sources({ items }: { items: RetrievedSource[] }) {
                 {s.section && (
                   <span className="text-neutral-500"> · {s.section}</span>
                 )}
+                {s.legal_scope && (
+                  <span
+                    className={`ml-2 rounded px-1.5 py-0.5 text-xs font-medium ${
+                      s.legal_scope === "international"
+                        ? "bg-sky-100 text-sky-900 dark:bg-sky-900/40 dark:text-sky-100"
+                        : "bg-orange-100 text-orange-900 dark:bg-orange-900/40 dark:text-orange-100"
+                    }`}
+                  >
+                    {SCOPE_LABELS[s.legal_scope]}
+                  </span>
+                )}
                 {s.is_fixture && (
                   <span className="ml-2 text-xs text-amber-700">(fixture)</span>
                 )}
               </summary>
               <p className="mt-2 whitespace-pre-wrap text-neutral-700 dark:text-neutral-300">
-                {s.text}
+                <LinkifiedText text={s.text} extraTerms={terms} />
               </p>
               <div className="mt-1 text-xs text-neutral-500">
                 {s.source_type}
@@ -352,16 +419,18 @@ export function Sources({ items }: { items: RetrievedSource[] }) {
 export function FinalAnswer({
   answer,
   disclaimer,
+  terms,
 }: {
   answer: string | null;
   disclaimer: string;
+  terms?: string[];
 }) {
   return (
     <>
       {answer && (
         <Section title="Summary">
           <p className="whitespace-pre-wrap text-sm leading-relaxed">
-            {answer}
+            <LinkifiedText text={answer} extraTerms={terms} />
           </p>
         </Section>
       )}

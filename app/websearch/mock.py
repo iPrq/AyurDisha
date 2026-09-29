@@ -82,6 +82,7 @@ class MockWebSearcher:
         *,
         num_results: int = 5,
         include_domains: list[str] | None = None,
+        country: str | None = None,
     ) -> list[WebSearchResult]:
         self.queries.append(query)
         tokens = set(re.findall(r"[a-z]+", query.lower()))

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { botanicalTerms } from "@/components/knowledge-graph/KnowledgeGraphProvider";
 import type {
   LegalScope,
   PatentAdvisorResponse,
@@ -14,15 +15,22 @@ import {
   Field,
   FinalAnswer,
   IngredientInput,
-  LegalScopeSelect,
   PdfUpload,
   Section,
   SourceIds,
+  SourceScopeToggle,
   Sources,
   SubmitButton,
   Verification,
   inputClass,
 } from "@/components/ui";
+
+const SOURCE_DESCRIPTIONS: Record<LegalScope, string> = {
+  domestic:
+    "Cites the Indian Patents Act 1970 (Section 3), CGPDTM examination guidelines, Indian patents and Indian case law.",
+  international:
+    "Cites US patent applications, the turmeric patent case and WIPO / EPO / USPTO web results. Indian Section 3 statute text is not retrieved.",
+};
 
 export default function PatentAdvisorPage() {
   const [product, setProduct] = useState("");
@@ -90,9 +98,11 @@ export default function PatentAdvisorPage() {
         <Field label="Ingredients">
           <IngredientInput value={ingredients} onChange={setIngredients} />
         </Field>
-        <Field label="Legal scope">
-          <LegalScopeSelect value={legalScope} onChange={setLegalScope} />
-        </Field>
+        <SourceScopeToggle
+          value={legalScope}
+          onChange={setLegalScope}
+          descriptions={SOURCE_DESCRIPTIONS}
+        />
         <Field label="Question" hint="Optional">
           <textarea
             className={inputClass}
@@ -282,9 +292,13 @@ function Results({ r }: { r: PatentAdvisorResponse }) {
       )}
 
       {r.botanical && <Botanicals items={[r.botanical]} />}
-      <FinalAnswer answer={r.final_answer} disclaimer={r.disclaimer} />
+      <FinalAnswer
+        answer={r.final_answer}
+        disclaimer={r.disclaimer}
+        terms={botanicalTerms([r.botanical])}
+      />
       <Verification v={r.verification} />
-      <Sources items={r.retrieved_sources} />
+      <Sources items={r.retrieved_sources} terms={botanicalTerms([r.botanical])} />
     </div>
   );
 }

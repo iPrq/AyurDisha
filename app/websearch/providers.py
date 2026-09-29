@@ -36,16 +36,20 @@ class SerperWebSearcher:
         *,
         num_results: int = 5,
         include_domains: list[str] | None = None,
+        country: str | None = None,
     ) -> list[WebSearchResult]:
+        payload: dict[str, Any] = {
+            "q": query + site_filter(include_domains),
+            "num": num_results,
+        }
+        gl = self._country if country is None else country
+        if gl:
+            payload["gl"] = gl
         try:
             resp = httpx.post(
                 self.endpoint,
                 headers={"X-API-KEY": self._api_key, "Content-Type": "application/json"},
-                json={
-                    "q": query + site_filter(include_domains),
-                    "num": num_results,
-                    "gl": self._country,
-                },
+                json=payload,
                 timeout=self._timeout,
             )
         except httpx.HTTPError as exc:
@@ -88,20 +92,20 @@ class GoogleCSEWebSearcher:
         *,
         num_results: int = 5,
         include_domains: list[str] | None = None,
+        country: str | None = None,
     ) -> list[WebSearchResult]:
+        params: dict[str, Any] = {
+            "key": self._api_key,
+            "cx": self._cse_id,
+            "q": query + site_filter(include_domains),
+            # The API rejects num > 10.
+            "num": max(1, min(10, num_results)),
+        }
+        gl = self._country if country is None else country
+        if gl:
+            params["gl"] = gl
         try:
-            resp = httpx.get(
-                self.endpoint,
-                params={
-                    "key": self._api_key,
-                    "cx": self._cse_id,
-                    "q": query + site_filter(include_domains),
-                    # The API rejects num > 10.
-                    "num": max(1, min(10, num_results)),
-                    "gl": self._country,
-                },
-                timeout=self._timeout,
-            )
+            resp = httpx.get(self.endpoint, params=params, timeout=self._timeout)
         except httpx.HTTPError as exc:
             raise WebSearchError(f"Google CSE request failed: {exc}") from exc
         data = _get_json(resp, "Google CSE")
@@ -132,6 +136,7 @@ class TavilyWebSearcher:
         *,
         num_results: int = 5,
         include_domains: list[str] | None = None,
+        country: str | None = None,
     ) -> list[WebSearchResult]:
         payload: dict[str, Any] = {
             "query": query,

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { botanicalTerms } from "@/components/knowledge-graph/KnowledgeGraphProvider";
 import type {
   AbsPurpose,
   EntityType,
@@ -268,9 +269,13 @@ function Results({ r }: { r: NbaAbsResponse }) {
       )}
 
       <Botanicals items={r.botanicals} />
-      <FinalAnswer answer={r.final_answer} disclaimer={r.disclaimer} />
+      <FinalAnswer
+        answer={r.final_answer}
+        disclaimer={r.disclaimer}
+        terms={botanicalTerms(r.botanicals)}
+      />
       <Verification v={r.verification} />
-      <Sources items={r.retrieved_sources} />
+      <Sources items={r.retrieved_sources} terms={botanicalTerms(r.botanicals)} />
     </div>
   );
 }

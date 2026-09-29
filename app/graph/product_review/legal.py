@@ -20,18 +20,10 @@ from llm.provider import get_chat_model
 from llm.structured import format_sources_for_prompt, structured_invoke
 from retrieval.base import LegalRetriever
 from retrieval.mock import get_mock_retriever
-from websearch.base import WebSearcher, search_many
+from websearch.base import NO_COUNTRY_BIAS, WebSearcher, search_many
+from websearch.domains import INDIA_REGULATOR_DOMAINS, INTERNATIONAL_REGULATOR_DOMAINS
 
 REGULATION_SOURCE_TYPES = ["regulation"]
-
-# Domestic web evidence is restricted to official regulator / gazette domains.
-INDIA_REGULATOR_DOMAINS = [
-    "ayush.gov.in",
-    "cdsco.gov.in",
-    "fssai.gov.in",
-    "indiacode.nic.in",
-    "egazette.gov.in",
-]
 
 
 def build_legal_query(state: dict[str, Any]) -> str:
@@ -130,12 +122,16 @@ def legal_compliance_node(
 
     if scope == LegalScope.INTERNATIONAL:
         market = target_market(state)
+        # A named target market may have a regulator outside the curated list.
+        domains = None if state.get("target_market") else INTERNATIONAL_REGULATOR_DOMAINS
         web_hits, errors = search_many(
             searcher,
             [f"{query} {market}"],
             num_results=cfg.web_search_results,
+            include_domains=domains,
             jurisdiction=market.lower(),
             legal_scope=LegalScope.INTERNATIONAL,
+            country=NO_COUNTRY_BIAS,
         )
     else:
         domains = INDIA_REGULATOR_DOMAINS if jurisdiction.lower() == "india" else None

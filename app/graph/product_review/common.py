@@ -12,6 +12,7 @@ from graph.models import (
     ReviewFinding,
 )
 from graph.prompts import PRODUCT_DOCUMENT_CONTEXT_HEADER, document_context_block
+from websearch.base import NO_COUNTRY_BIAS
 
 
 def coerce_scope(value: Any) -> LegalScope:
@@ -20,8 +21,23 @@ def coerce_scope(value: Any) -> LegalScope:
     return LegalScope(str(value or "domestic").lower())
 
 
+def is_international(state: dict[str, Any]) -> bool:
+    return coerce_scope(state.get("legal_scope")) == LegalScope.INTERNATIONAL
+
+
+def sourcing_region(state: dict[str, Any]) -> str:
+    if is_international(state):
+        return "global"
+    return (state.get("jurisdiction") or "india").strip()
+
+
 def target_market(state: dict[str, Any]) -> str:
-    return (state.get("target_market") or state.get("jurisdiction") or "india").strip()
+    return (state.get("target_market") or "").strip() or sourcing_region(state)
+
+
+def search_country(state: dict[str, Any]) -> str | None:
+    """Web search geo bias: configured default for Indian scope, none for international."""
+    return NO_COUNTRY_BIAS if is_international(state) else None
 
 
 def resource_names(state: dict[str, Any], limit: int | None = None) -> list[str]:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 
 from api.patent_advisor import _to_legal_scope
 from api.pdf_upload import extract_product_document
@@ -16,6 +16,7 @@ from graph.models import (
 )
 from graph.product_review_graph import build_product_review_graph
 from knowledge_graph.factory import get_knowledge_graph
+from knowledge_graph.service import record_response
 from llm import is_transient_llm_error
 from retrieval.factory import get_retriever
 from websearch.factory import get_web_searcher
@@ -60,7 +61,9 @@ def state_to_response(
 
 
 @router.post("/product-review", response_model=ProductReviewResponse)
-def product_review(request: ProductReviewRequest) -> ProductReviewResponse:
+def product_review(
+    request: ProductReviewRequest, background_tasks: BackgroundTasks
+) -> ProductReviewResponse:
     """Market feasibility, legal compliance and resource accessibility (decision support)."""
     try:
         initial: dict[str, Any] = {
@@ -80,7 +83,9 @@ def product_review(request: ProductReviewRequest) -> ProductReviewResponse:
             initial["document_text"] = request.document_text
 
         result = get_graph().invoke(initial)
-        return state_to_response(result, request)
+        response = state_to_response(result, request)
+        background_tasks.add_task(record_response, response, feature="product_review")
+        return response
     except Exception as exc:  # noqa: BLE001
         if is_transient_llm_error(exc):
             raise HTTPException(

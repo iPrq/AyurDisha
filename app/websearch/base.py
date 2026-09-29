@@ -23,6 +23,10 @@ class WebSearchConfigError(RuntimeError):
     """WEB_SEARCH_BACKEND is unknown or its API key is missing."""
 
 
+# Pass as ``country`` to drop the configured geo bias (e.g. gl=in) for international searches.
+NO_COUNTRY_BIAS = ""
+
+
 class WebSearchResult(BaseModel):
     title: str
     url: str | None = None
@@ -34,12 +38,15 @@ class WebSearchResult(BaseModel):
 
 @runtime_checkable
 class WebSearcher(Protocol):
+    """``country`` overrides the configured geo bias; None keeps the default."""
+
     def search(
         self,
         query: str,
         *,
         num_results: int = 5,
         include_domains: list[str] | None = None,
+        country: str | None = None,
     ) -> list[WebSearchResult]:
         ...
 
@@ -53,6 +60,7 @@ class NullWebSearcher:
         *,
         num_results: int = 5,
         include_domains: list[str] | None = None,
+        country: str | None = None,
     ) -> list[WebSearchResult]:
         return []
 
@@ -98,15 +106,18 @@ def search_many(
     include_domains: list[str] | None = None,
     jurisdiction: str | None = None,
     legal_scope: LegalScope | None = None,
+    country: str | None = None,
 ) -> tuple[list[RetrievedSource], list[str]]:
     """Run queries concurrently; return de-duplicated sources and per-query errors."""
     queries = [q for q in dict.fromkeys(q.strip() for q in queries) if q]
     if not queries:
         return [], []
 
+    extra = {} if country is None else {"country": country}
+
     def _one(query: str) -> list[WebSearchResult]:
         return searcher.search(
-            query, num_results=num_results, include_domains=include_domains
+            query, num_results=num_results, include_domains=include_domains, **extra
         )
 
     sources: dict[str, RetrievedSource] = {}

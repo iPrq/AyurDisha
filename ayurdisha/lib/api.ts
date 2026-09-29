@@ -1,4 +1,7 @@
 import type {
+  KgGraph,
+  KgNode,
+  KgTerm,
   NbaAbsRequest,
   NbaAbsResponse,
   PatentAdvisorRequest,
@@ -75,4 +78,11 @@ export const api = {
     post<NbaAbsResponse>("/api/v1/nba-abs", body),
   extractNbaAbsDocument: (file: File) =>
     uploadPdf<ProductDocumentExtractResponse>("/api/v1/nba-abs/extract", file),
+  kgEntity: (q: string, depth = 1) =>
+    request<KgGraph>(
+      `/api/v1/kg/entity?${new URLSearchParams({ q, depth: String(depth) })}`,
+    ),
+  kgSearch: (q: string) =>
+    request<KgNode[]>(`/api/v1/kg/search?${new URLSearchParams({ q })}`),
+  kgVocabulary: () => request<KgTerm[]>("/api/v1/kg/vocabulary"),
 };

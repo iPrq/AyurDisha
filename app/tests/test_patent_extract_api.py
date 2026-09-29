@@ -12,6 +12,7 @@ from graph.prompts import DOCUMENT_CONTEXT_HEADER
 from main import app
 from tests.conftest import ScriptedLLM
 from tests.pdf_helpers import text_pdf
+from websearch.mock import MockWebSearcher
 
 client = TestClient(app)
 
@@ -88,7 +89,7 @@ def test_document_text_is_prompt_context_not_evidence():
         return result
 
     llm = ScriptedLLM({"Section3Results": _section3})
-    patent_api._graph = build_patent_advisor_graph(llm=llm)
+    patent_api._graph = build_patent_advisor_graph(llm=llm, searcher=MockWebSearcher())
     try:
         resp = client.post(
             "/api/v1/patent-advisor",

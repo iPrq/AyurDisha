@@ -8,11 +8,13 @@ from config import Settings, get_settings
 from graph.models import MarketFeasibilityAssessment, RetrievedSource
 from graph.product_review.common import (
     botanical_context,
+    coerce_scope,
     filter_ids,
     finalize_rating,
     product_document_context,
     resource_names,
     sanitize_findings,
+    search_country,
     target_market,
 )
 from graph.prompts import MARKET_FEASIBILITY_SYSTEM
@@ -100,6 +102,8 @@ def market_feasibility_node(
         build_market_queries(state),
         num_results=cfg.web_search_results,
         jurisdiction=target_market(state).lower(),
+        legal_scope=coerce_scope(state.get("legal_scope")),
+        country=search_country(state),
     )
     assessment = assess_market_feasibility(state, sources, llm=model)
 

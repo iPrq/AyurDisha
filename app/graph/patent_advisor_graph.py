@@ -20,24 +20,30 @@ from graph.state import PatentAdvisorState
 from knowledge_graph.base import BotanicalKnowledgeGraph
 from llm.provider import get_chat_model
 from retrieval.base import LegalRetriever
+from websearch.base import WebSearcher
+from websearch.factory import get_web_searcher
 
 
 def build_patent_advisor_graph(
     *,
     kg: BotanicalKnowledgeGraph | None = None,
     retriever: LegalRetriever | None = None,
+    searcher: WebSearcher | None = None,
     settings: Settings | None = None,
     llm: Any | None = None,
 ):
     """Compile Patent Advisor StateGraph with NIM-backed reasoning nodes."""
     cfg = settings or get_settings()
     model = llm if llm is not None else get_chat_model(settings=cfg)
+    web = searcher if searcher is not None else get_web_searcher(cfg)
 
     def _botanical(state: PatentAdvisorState) -> dict[str, Any]:
         return botanical_normalizer_node(state, kg=kg, settings=cfg, llm=model)
 
     def _retrieval(state: PatentAdvisorState) -> dict[str, Any]:
-        return legal_patent_retrieval_node(state, retriever=retriever, settings=cfg)
+        return legal_patent_retrieval_node(
+            state, retriever=retriever, searcher=web, settings=cfg
+        )
 
     def _section3(state: PatentAdvisorState) -> dict[str, Any]:
         return section3_scorer_node(state, settings=cfg, llm=model)
@@ -90,12 +96,13 @@ def run_patent_advisor(
     document_text: str | None = None,
     kg: BotanicalKnowledgeGraph | None = None,
     retriever: LegalRetriever | None = None,
+    searcher: WebSearcher | None = None,
     settings: Settings | None = None,
     llm: Any | None = None,
 ) -> dict[str, Any]:
     """Invoke the Patent Advisor graph with a request payload."""
     app = build_patent_advisor_graph(
-        kg=kg, retriever=retriever, settings=settings, llm=llm
+        kg=kg, retriever=retriever, searcher=searcher, settings=settings, llm=llm
     )
     initial: PatentAdvisorState = {
         "product": product,

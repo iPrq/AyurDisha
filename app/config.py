@@ -95,6 +95,18 @@ class Settings(BaseModel):
     # Max document characters passed into Patent Advisor prompts
     patent_doc_context_chars: int = Field(default=12000)
 
+    # Knowledge graph: neo4j (when NEO4J_URI is set) or an in-memory fallback
+    kg_backend: str = Field(default="memory")
+    neo4j_uri: str | None = Field(default=None)
+    neo4j_user: str = Field(default="neo4j")
+    neo4j_password: str | None = Field(default=None)
+    neo4j_database: str | None = Field(default=None)
+    # Seed curated herbs + corpus mentions at startup when the graph is empty
+    kg_auto_seed: bool = Field(default=True)
+    kg_corpus_dir: str = Field(default="./data/raw/corpus")
+    # Write each pipeline response (product, herbs, sources) into the graph
+    kg_record_responses: bool = Field(default=True)
+
     def redacted(self) -> dict[str, object]:
         """Settings dump safe for logs (secrets masked)."""
         data = self.model_dump()
@@ -104,6 +116,7 @@ class Settings(BaseModel):
             "serper_api_key",
             "google_cse_api_key",
             "tavily_api_key",
+            "neo4j_password",
         ):
             data[key] = "***" if data.get(key) else None
         return data
@@ -202,4 +215,14 @@ def get_settings() -> Settings:
         pdf_ocr_min_chars=_env_int("PDF_OCR_MIN_CHARS", 50),
         pdf_ocr_dpi=_env_int("PDF_OCR_DPI", 200),
         patent_doc_context_chars=_env_int("PATENT_DOC_CONTEXT_CHARS", 12000),
+        kg_backend=(
+            _env_str("KG_BACKEND", "neo4j" if _env_str("NEO4J_URI") else "memory") or "memory"
+        ).lower(),
+        neo4j_uri=_env_str("NEO4J_URI"),
+        neo4j_user=_env_str("NEO4J_USER", _env_str("NEO4J_USERNAME", "neo4j")) or "neo4j",
+        neo4j_password=_env_str("NEO4J_PASSWORD"),
+        neo4j_database=_env_str("NEO4J_DATABASE"),
+        kg_auto_seed=_env_bool("KG_AUTO_SEED", True),
+        kg_corpus_dir=_env_str("KG_CORPUS_DIR", "./data/raw/corpus") or "./data/raw/corpus",
+        kg_record_responses=_env_bool("KG_RECORD_RESPONSES", True),
     )

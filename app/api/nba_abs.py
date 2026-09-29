@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 
 from api.pdf_upload import extract_product_document
 from config import get_settings
 from graph.models import NbaAbsRequest, NbaAbsResponse, ProductDocumentExtractResponse
 from graph.nba_abs_graph import build_nba_abs_graph
 from knowledge_graph.factory import get_knowledge_graph
+from knowledge_graph.service import record_response
 from llm import is_transient_llm_error
 from retrieval.factory import get_retriever
 
@@ -51,7 +52,7 @@ def state_to_response(state: dict[str, Any], request: NbaAbsRequest) -> NbaAbsRe
 
 
 @router.post("/nba-abs", response_model=NbaAbsResponse)
-def nba_abs(request: NbaAbsRequest) -> NbaAbsResponse:
+def nba_abs(request: NbaAbsRequest, background_tasks: BackgroundTasks) -> NbaAbsResponse:
     """ABS applicability + source-grounded rate + deterministic fee (decision support)."""
     try:
         initial: dict[str, Any] = {
@@ -71,7 +72,9 @@ def nba_abs(request: NbaAbsRequest) -> NbaAbsResponse:
             initial["user_query"] = request.user_query
 
         result = get_graph().invoke(initial)
-        return state_to_response(result, request)
+        response = state_to_response(result, request)
+        background_tasks.add_task(record_response, response, feature="nba_abs")
+        return response
     except Exception as exc:  # noqa: BLE001
         if is_transient_llm_error(exc):
             raise HTTPException(

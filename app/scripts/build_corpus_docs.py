@@ -272,6 +272,40 @@ PDF_DOCS = [
         "mode": "prose",
         "scope": "Full article (US turmeric patent revocation; TK documentation)",
     },
+    {
+        "doc_id": "official_biological_diversity_act_2002",
+        "source_dir": "official_biological_diversity_act_2002",
+        "source_file": "biological_diversity_act_2002_official.pdf",
+        "title": "The Biological Diversity Act, 2002 (Official Gazette)",
+        "source_type": "statute",
+        "jurisdiction": "india",
+        "legal_scope": "domestic",
+        "section_label_prefix": "BDA",
+        "mode": "prose",
+        "scope": "Official gazette version",
+    },
+    {
+        "doc_id": "bda_guidelines_2014",
+        "source_dir": "bda_guidelines_2014",
+        "source_file": "bda_guidelines_2014.pdf",
+        "title": "Guidelines on Access to Biological Resources and Associated Knowledge and Benefits Sharing Regulations, 2014",
+        "source_type": "guideline",
+        "jurisdiction": "india",
+        "legal_scope": "domestic",
+        "mode": "prose",
+        "scope": "National Biodiversity Authority guidelines",
+    },
+    {
+        "doc_id": "uspto_mpep_2100",
+        "source_dir": "uspto_mpep_2100",
+        "source_file": "mpep_2100.pdf",
+        "title": "MPEP Chapter 2100 Patentability",
+        "source_type": "guideline",
+        "jurisdiction": "us",
+        "legal_scope": "international",
+        "mode": "prose",
+        "scope": "MPEP Chapter 2100",
+    },
 ]
 
 
@@ -301,8 +335,8 @@ def _write_meta(doc_id: str, **fields) -> None:
         "effective_date": fields.get("effective_date"),
         "jurisdiction": fields.get("jurisdiction", "india"),
         "legal_scope": fields.get("legal_scope", "domestic"),
-        "section_prefix": None,
-        "section_label_prefix": None,
+        "section_prefix": fields.get("section_prefix"),
+        "section_label_prefix": fields.get("section_label_prefix"),
         "is_fixture": False,
     }
     (OUT / f"{doc_id}.meta.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8", newline="\n")
@@ -437,6 +471,41 @@ def build_bhaishajya_kalpana_kosha() -> dict:
     return _user_row(doc, doc_id, scope, source_dir, prov)
 
 
+def build_us_turmeric_patent() -> dict:
+    source_dir, stored = "us_turmeric_patent", "us5401504.pdf"
+    path, prov = _verified_source(source_dir, stored)
+
+    doc_id = "us_turmeric_patent_us5401504"
+    doc = OUT / f"{doc_id}.json"
+
+    abstract = "Method of promoting healing of a wound by administering turmeric to a patient afflicted with the wound."
+    first_claim = "1. A method of promoting healing of a wound in a patient, which consists essentially of administering a wound-healing agent consisting of an effective amount of turmeric powder to said patient."
+
+    records = [{
+        "publication_number": "US5401504A",
+        "title": "USE OF TURMERIC IN WOUND HEALING",
+        "abstract": abstract,
+        "first_claim": first_claim,
+        "url": None,
+        "publication_date": "1995-03-28",
+        "jurisdiction": "us"
+    }]
+    
+    doc.write_text(json.dumps(records, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    _write_meta(
+        doc_id,
+        title="US Patent 5401504A - USE OF TURMERIC IN WOUND HEALING",
+        source_type="patent",
+        source_url=None,
+        jurisdiction="us",
+        legal_scope="international"
+    )
+    
+    print(f"[OK] {doc.name}: 1 US patent record")
+    scope = "Extracted US Patent 5401504A (Abstract and Claim 1 hardcoded from PDF text)"
+    return _user_row(doc, doc_id, scope, source_dir, prov)
+
+
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     rows = []
@@ -483,6 +552,7 @@ def main() -> int:
     rows.append(build_hupd_patents())
     rows.append(build_lens_patents())
     rows.append(build_bhaishajya_kalpana_kosha())
+    rows.append(build_us_turmeric_patent())
     rows.extend(build_pdf_doc(spec) for spec in PDF_DOCS)
     with (OUT / "CORPUS_PROVENANCE.csv").open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0]))

@@ -1,4 +1,4 @@
-"""Knowledge-graph package (mock now; Neo4j later)."""
+"""Knowledge-graph package: Neo4j store (in-memory fallback) + botanical lookup."""
 
 from knowledge_graph.base import BotanicalKnowledgeGraph
 from knowledge_graph.factory import get_knowledge_graph
