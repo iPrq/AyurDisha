@@ -31,8 +31,12 @@ import {
   Sources,
   SubmitButton,
   Verification,
+  formCardClass,
   inputClass,
 } from "@/components/ui";
+import { LoadingPanel } from "@/components/tool/LoadingPanel";
+import { PageHero } from "@/components/tool/PageHero";
+import { ResultsReveal } from "@/components/tool/ResultsReveal";
 
 const inr = (n: number) =>
   n.toLocaleString("en-IN", {
@@ -138,8 +142,13 @@ export default function NbaAbsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-semibold">NBA / ABS Calculator</h1>
+    <div className="space-y-8">
+      <PageHero
+        eyebrow="NBA / ABS Calculator"
+        title="Do I owe benefit sharing?"
+        desc="Biological Diversity Act applicability, NBA approval requirements, benefit-sharing rate and fee calculation."
+        pose="share"
+      />
       <ContextChip
         imported={bridge.imported}
         hasFormulation={!!bridge.formulation}
@@ -148,7 +157,15 @@ export default function NbaAbsPage() {
         onDetach={bridge.detach}
       />
 
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className={formCardClass}>
+        <p className="rounded-2xl border border-line bg-mint/60 px-4 py-3 text-sm">
+          <span className="font-semibold">Sources:</span> India{" "}
+          <span className="text-xs text-muted">
+            · Access and benefit sharing is governed by the Biological Diversity
+            Act, 2002, so this tool always uses Indian law, whatever the header
+            setting.
+          </span>
+        </p>
         <PdfUpload
           label="Upload product document (PDF)"
           hint="Optional. Only pre-fills product and ingredients below; the document is not sent with the calculation."
@@ -258,7 +275,12 @@ export default function NbaAbsPage() {
 
       <StreamProgress steps={bridge.steps} active={loading} />
       {error && <ErrorBanner message={error} />}
-      {result && <Results r={result} />}
+      {loading && <LoadingPanel />}
+      {result && (
+        <ResultsReveal>
+          <Results r={result} />
+        </ResultsReveal>
+      )}
     </div>
   );
 }

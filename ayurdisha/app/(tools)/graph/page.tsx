@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { GraphExplorer } from "@/components/knowledge-graph/GraphExplorer";
 import { labelColor, LABELS } from "@/components/knowledge-graph/labels";
+import { PageHero } from "@/components/tool/PageHero";
 import { inputClass } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { KgNode } from "@/lib/types";
@@ -37,15 +38,14 @@ export default function GraphPage() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold">Knowledge graph</h1>
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          Herbs, compounds, classical formulations, patents and the sources behind
-          every analysis, stored in Neo4j. Click a node for details and use
-          &quot;Explore from here&quot; to move through the graph.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHero
+        eyebrow="Knowledge Graph"
+        title="See how every herb connects"
+        desc="Herbs, compounds, classical formulations, patents and the sources behind every analysis, stored in Neo4j. Click a node for details and use “Explore from here” to move through the graph."
+        pose="connect"
+        assistant={false}
+      />
 
       <form
         className="relative"
@@ -64,13 +64,13 @@ export default function GraphPage() {
           }}
         />
         {suggestions.length > 0 && (
-          <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded border border-neutral-200 bg-white text-sm shadow dark:border-neutral-700 dark:bg-neutral-900">
+          <ul className="absolute z-10 mt-2 w-full overflow-hidden rounded-2xl border border-line bg-surface text-sm shadow-soft">
             {suggestions.map((s) => (
               <li key={s.key}>
                 <button
                   type="button"
                   onClick={() => choose(s.key)}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  className="flex w-full items-center gap-2 px-4 py-2 text-left hover:bg-mint"
                 >
                   <span
                     className="h-2.5 w-2.5 rounded-full"
@@ -93,14 +93,14 @@ export default function GraphPage() {
             key={ex}
             type="button"
             onClick={() => choose(ex)}
-            className="rounded bg-green-100 px-2 py-0.5 text-green-900 hover:bg-green-200 dark:bg-green-900/40 dark:text-green-100"
+            className="rounded-full bg-blob px-3 py-1 font-medium text-leaf transition-colors hover:bg-leaf hover:text-canvas"
           >
             {ex}
           </button>
         ))}
       </div>
 
-      <div className="h-[70vh] overflow-hidden rounded border border-neutral-200 dark:border-neutral-800">
+      <div className="h-[70vh] overflow-hidden rounded-[2rem] border border-line bg-surface shadow-soft">
         <GraphExplorer key={query} query={query} />
       </div>
     </div>

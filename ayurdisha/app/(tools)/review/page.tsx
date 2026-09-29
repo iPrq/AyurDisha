@@ -34,8 +34,13 @@ import {
   Sources,
   SubmitButton,
   Verification,
+  formCardClass,
   inputClass,
 } from "@/components/ui";
+import { LoadingPanel } from "@/components/tool/LoadingPanel";
+import { PageHero } from "@/components/tool/PageHero";
+import { ResultsReveal } from "@/components/tool/ResultsReveal";
+import { useSourceScope } from "@/components/site/SourceScope";
 
 const SOURCE_DESCRIPTIONS: Record<LegalScope, string> = {
   domestic:
@@ -49,7 +54,7 @@ export default function ProductReviewPage() {
   const [ingredients, setIngredients] = useState<string[]>([]);
   const [category, setCategory] = useState("");
   const [targetMarket, setTargetMarket] = useState("");
-  const [legalScope, setLegalScope] = useState<LegalScope>("domestic");
+  const { scope: legalScope, setScope: setLegalScope } = useSourceScope();
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -136,8 +141,13 @@ export default function ProductReviewPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Product Review</h1>
+    <div className="space-y-8">
+      <PageHero
+        eyebrow="Product Review"
+        title="Is my product ready for the market?"
+        desc="Market feasibility, legal compliance and resource accessibility, each rated separately and backed by cited evidence."
+        pose="inspect"
+      />
       <ContextChip
         imported={bridge.imported}
         hasFormulation={!!bridge.formulation}
@@ -146,7 +156,7 @@ export default function ProductReviewPage() {
         onDetach={bridge.detach}
       />
 
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className={formCardClass}>
         <PdfUpload
           label="Upload product document (PDF)"
           hint="Optional. Dossier, label or spec sheet; scanned PDFs are OCR'd. Extracted product, ingredients and category pre-fill the form below for review."
@@ -214,7 +224,12 @@ export default function ProductReviewPage() {
 
       <StreamProgress steps={bridge.steps} active={loading} />
       {error && <ErrorBanner message={error} />}
-      {result && <Results r={result} />}
+      {loading && <LoadingPanel />}
+      {result && (
+        <ResultsReveal>
+          <Results r={result} />
+        </ResultsReveal>
+      )}
     </div>
   );
 }

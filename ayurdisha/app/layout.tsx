@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
+import {
+  Geist,
+  Geist_Mono,
+  Noto_Sans_Devanagari,
+  Plus_Jakarta_Sans,
+} from "next/font/google";
 import { AgentShell } from "@/components/agent/AgentShell";
-import { HealthDot } from "@/components/HealthDot";
 import { KnowledgeGraphProvider } from "@/components/knowledge-graph/KnowledgeGraphProvider";
+import { SiteFooter } from "@/components/site/SiteFooter";
+import { SiteHeader } from "@/components/site/SiteHeader";
+import { SourceScopeProvider } from "@/components/site/SourceScope";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,53 +22,47 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const jakarta = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
+});
+
+const devanagari = Noto_Sans_Devanagari({
+  variable: "--font-noto-devanagari",
+  subsets: ["devanagari"],
+  weight: ["500"],
+});
+
 export const metadata: Metadata = {
   title: "AyurDisha",
   description:
     "Decision support for Ayurvedic products: market, regulatory, patent and ABS analysis.",
 };
 
-const NAV = [
-  { href: "/formulation", label: "Formulation" },
-  { href: "/review", label: "Product Review" },
-  { href: "/patent", label: "Patent Advisor" },
-  { href: "/nba-abs", label: "NBA / ABS" },
-  { href: "/graph", label: "Knowledge Graph" },
-] as const;
+// Marks the document as JS-enabled before first paint so [data-reveal]
+// elements can start hidden for GSAP without a flash.
+const JS_FLAG = "document.documentElement.classList.add('js')";
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+      className={`${geistSans.variable} ${geistMono.variable} ${jakarta.variable} ${devanagari.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col font-sans">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: JS_FLAG }} />
+      </head>
+      <body className="flex min-h-full flex-col bg-canvas font-sans text-ink">
         <KnowledgeGraphProvider>
-          <AgentShell>
-            <header className="border-b border-neutral-200 dark:border-neutral-800">
-              <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-                <Link href="/" className="font-semibold text-green-800 dark:text-green-400">
-                  AyurDisha
-                </Link>
-                <nav className="flex gap-4 text-sm">
-                  {NAV.map((n) => (
-                    <Link key={n.href} href={n.href} className="hover:underline">
-                      {n.label}
-                    </Link>
-                  ))}
-                </nav>
-                <div className="ml-auto">
-                  <HealthDot />
-                </div>
-              </div>
-            </header>
-            <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8">
-              {children}
-            </main>
-            <footer className="border-t border-neutral-200 py-4 text-center text-xs text-neutral-500 dark:border-neutral-800">
-              Decision support only. Not legal, regulatory, or investment advice.
-            </footer>
-          </AgentShell>
+          <SourceScopeProvider>
+            <AgentShell>
+              <SiteHeader />
+              <div className="flex flex-1 flex-col">{children}</div>
+              <SiteFooter />
+            </AgentShell>
+          </SourceScopeProvider>
         </KnowledgeGraphProvider>
       </body>
     </html>

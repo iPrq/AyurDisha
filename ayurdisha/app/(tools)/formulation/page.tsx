@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useAgent } from "@/components/agent/AgentProvider";
+import { AskDishaHint } from "@/components/agent/AskDishaHint";
 import { EvidenceDrawer } from "@/components/formulation/EvidenceDrawer";
 import { ExtractionWorkspace } from "@/components/formulation/ExtractionWorkspace";
 import { FormulationMap } from "@/components/formulation/FormulationMap";
@@ -105,13 +106,18 @@ export default function FormulationPage() {
   }
 
   return (
-    <div className="relative left-1/2 w-[min(calc(100vw-2rem-var(--dock,0px)),1280px)] -translate-x-1/2 space-y-5">
+    <div className="relative left-1/2 w-[min(calc(100vw-5rem-var(--dock,0px)),1280px)] -translate-x-1/2 space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Formulation Intelligence</h1>
           <p className="text-sm text-neutral-600 dark:text-neutral-400">
             One structured formulation shared by Product Review, Patent Advisor and NBA / ABS.
           </p>
+          {!formulation && (
+            <div className="pt-3">
+              <AskDishaHint />
+            </div>
+          )}
         </div>
         {formulation && (
           <button type="button" onClick={reset} className="text-sm text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200">

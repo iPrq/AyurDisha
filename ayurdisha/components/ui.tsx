@@ -5,6 +5,7 @@ import {
   EntityLink,
   LinkifiedText,
 } from "@/components/knowledge-graph/KnowledgeGraphProvider";
+import { Dishu } from "@/components/mascot/Dishu";
 import type {
   BotanicalResult,
   DocumentExtractResponse,
@@ -15,7 +16,11 @@ import type {
 } from "@/lib/types";
 
 export const inputClass =
-  "w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-green-700 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900";
+  "w-full rounded-xl border border-line bg-surface px-4 py-2.5 text-sm text-ink placeholder:text-neutral-400 transition-shadow focus:border-leaf-bright focus:outline-none focus:ring-4 focus:ring-leaf-bright/15";
+
+/** Card wrapper for tool forms. */
+export const formCardClass =
+  "space-y-5 rounded-[2rem] border border-line bg-surface p-6 shadow-soft sm:p-8";
 
 export function Field({
   label,
@@ -27,10 +32,10 @@ export function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block space-y-1">
-      <span className="text-sm font-medium">{label}</span>
+    <label className="block space-y-1.5">
+      <span className="text-sm font-semibold">{label}</span>
       {children}
-      {hint && <span className="block text-xs text-neutral-500">{hint}</span>}
+      {hint && <span className="block text-xs text-muted">{hint}</span>}
     </label>
   );
 }
@@ -71,12 +76,12 @@ export function IngredientInput({
           {value.map((v) => (
             <span
               key={v}
-              className="flex items-center gap-1 rounded bg-green-100 px-2 py-0.5 text-sm text-green-900 dark:bg-green-900/40 dark:text-green-100"
+              className="flex items-center gap-1 rounded-full bg-blob px-3 py-1 text-sm font-medium text-leaf"
             >
               {v}
               <button
                 type="button"
-                className="text-green-700 hover:text-red-600"
+                className="text-leaf hover:text-clay"
                 onClick={() => onChange(value.filter((x) => x !== v))}
                 aria-label={`Remove ${v}`}
               >
@@ -95,6 +100,10 @@ const SCOPE_LABELS: Record<LegalScope, string> = {
   international: "International",
 };
 
+/**
+ * Indian / international sources. `value`/`onChange` come from
+ * `useSourceScope`, so the choice is shared by every tool page.
+ */
 export function SourceScopeToggle({
   value,
   onChange,
@@ -105,12 +114,12 @@ export function SourceScopeToggle({
   descriptions: Record<LegalScope, string>;
 }) {
   return (
-    <div className="space-y-1">
-      <span className="block text-sm font-medium">Sources</span>
+    <div className="space-y-1.5">
+      <span className="block text-sm font-semibold">Sources</span>
       <div
         role="radiogroup"
         aria-label="Sources"
-        className="inline-flex rounded border border-neutral-300 p-0.5 dark:border-neutral-700"
+        className="inline-flex rounded-full border border-line bg-mint p-1"
       >
         {(Object.keys(SCOPE_LABELS) as LegalScope[]).map((scope) => (
           <button
@@ -119,18 +128,18 @@ export function SourceScopeToggle({
             role="radio"
             aria-checked={value === scope}
             onClick={() => onChange(scope)}
-            className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${
+            className={`rounded-full px-5 py-1.5 text-sm font-semibold transition-colors ${
               value === scope
-                ? "bg-green-700 text-white"
-                : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                ? "bg-leaf text-canvas shadow-soft"
+                : "text-muted hover:text-ink"
             }`}
           >
             {SCOPE_LABELS[scope]}
           </button>
         ))}
       </div>
-      <span className="block text-xs text-neutral-500">
-        {descriptions[value]}
+      <span className="block text-xs text-muted">
+        {descriptions[value]} Your choice carries over to the other tools.
       </span>
     </div>
   );
@@ -141,43 +150,71 @@ export function SubmitButton({ loading }: { loading: boolean }) {
     <button
       type="submit"
       disabled={loading}
-      className="rounded bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:opacity-50"
+      className="inline-flex items-center gap-2 rounded-full bg-turmeric px-7 py-3 text-sm font-semibold text-[#14261C] shadow-soft transition-transform hover:-translate-y-0.5 hover:bg-turmeric-deep disabled:translate-y-0 disabled:opacity-60"
     >
-      {loading ? "Analyzing... (this can take a minute)" : "Run analysis"}
+      {loading && (
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#14261C]/30 border-t-[#14261C]" />
+      )}
+      {loading ? "Analysing..." : "Run analysis"}
     </button>
   );
 }
 
 export function ErrorBanner({ message }: { message: string }) {
+  const offline = /unreachable|failed to fetch|502/i.test(message);
   return (
-    <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
-      {message}
+    <div
+      role="alert"
+      className="flex items-center gap-4 rounded-3xl border border-clay/40 bg-clay/10 p-4 text-sm"
+    >
+      <Dishu pose={offline ? "sleep" : "shrug"} size={72} className="shrink-0" />
+      <div className="space-y-1">
+        <p className="font-display font-bold">
+          {offline ? "The backend is taking a nap" : "Something went wrong"}
+        </p>
+        <p className="text-muted">{message}</p>
+        {offline && (
+          <p className="text-xs text-muted">
+            Start the API from <code className="font-mono">app/</code> with{" "}
+            <code className="font-mono">uv run uvicorn main:app --reload</code>.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
 
+const TONE = {
+  good: "bg-[#DDF1E2] text-[#1E6B43] dark:bg-leaf/15 dark:text-leaf",
+  warn: "bg-[#FDEBD0] text-[#8A520A] dark:bg-turmeric/15 dark:text-turmeric",
+  bad: "bg-[#FBE1D6] text-[#A5401A] dark:bg-clay/20 dark:text-[#F4A585]",
+  review: "bg-[#DCE8FF] text-[#2F5BC0] dark:bg-sky/15 dark:text-sky",
+};
+
 const BADGE_COLORS: Record<string, string> = {
-  FAVORABLE: "bg-green-100 text-green-900",
-  PASS: "bg-green-100 text-green-900",
-  RESOLVED: "bg-green-100 text-green-900",
-  SUPPORTED: "bg-green-100 text-green-900",
-  NOT_APPLICABLE: "bg-green-100 text-green-900",
-  MODERATE: "bg-amber-100 text-amber-900",
-  AMBIGUOUS: "bg-amber-100 text-amber-900",
-  PARTIALLY_SUPPORTED: "bg-amber-100 text-amber-900",
-  UNCERTAIN: "bg-amber-100 text-amber-900",
-  HUMAN_REVIEW_REQUIRED: "bg-amber-100 text-amber-900",
-  CHALLENGING: "bg-red-100 text-red-900",
-  FAIL: "bg-red-100 text-red-900",
-  UNSUPPORTED: "bg-red-100 text-red-900",
-  APPLICABLE: "bg-red-100 text-red-900",
+  FAVORABLE: TONE.good,
+  PASS: TONE.good,
+  RESOLVED: TONE.good,
+  SUPPORTED: TONE.good,
+  NOT_APPLICABLE: TONE.good,
+  MODERATE: TONE.warn,
+  AMBIGUOUS: TONE.warn,
+  PARTIALLY_SUPPORTED: TONE.warn,
+  UNCERTAIN: TONE.warn,
+  EVIDENCE_GAP: TONE.warn,
+  HUMAN_REVIEW_REQUIRED: TONE.review,
+  CHALLENGING: TONE.bad,
+  FAIL: TONE.bad,
+  UNSUPPORTED: TONE.bad,
+  APPLICABLE: TONE.bad,
+  TRIGGERED: TONE.bad,
 };
 
 export function Badge({ value }: { value: string }) {
   return (
     <span
-      className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${
-        BADGE_COLORS[value] ?? "bg-neutral-200 text-neutral-800"
+      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+        BADGE_COLORS[value] ?? "bg-mint text-muted"
       }`}
     >
       {value.replaceAll("_", " ")}
@@ -195,9 +232,9 @@ export function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-3 rounded border border-neutral-200 p-4 dark:border-neutral-800">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="font-semibold">{title}</h2>
+    <section className="result-section space-y-4 rounded-3xl border border-line bg-surface p-5 shadow-soft sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-display text-lg font-bold">{title}</h2>
         {right}
       </div>
       {children}
@@ -213,7 +250,7 @@ export function SourceIds({ ids }: { ids: string[] }) {
         <a
           key={id}
           href={`#src-${id}`}
-          className="rounded bg-neutral-100 px-1.5 font-mono text-xs text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300"
+          className="rounded-md bg-mint px-1.5 font-mono text-xs text-muted hover:bg-blob hover:text-leaf"
         >
           {id}
         </a>
@@ -360,7 +397,7 @@ export function Sources({
           <li
             key={s.id}
             id={`src-${s.id}`}
-            className="scroll-mt-20 rounded border border-neutral-200 p-2 text-sm target:border-green-600 target:bg-green-50 dark:border-neutral-800 dark:target:bg-green-950"
+            className="scroll-mt-24 rounded-xl border border-line p-3 text-sm target:border-leaf-bright target:bg-mint"
           >
             <details>
               <summary className="cursor-pointer">
@@ -491,7 +528,7 @@ export function PdfUpload<T extends DocumentExtractResponse>({
           accept="application/pdf"
           disabled={extracting || disabled}
           onChange={onFile}
-          className="block w-full text-sm file:mr-3 file:rounded file:border-0 file:bg-green-700 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-green-800 disabled:opacity-50"
+          className="block w-full cursor-pointer rounded-2xl border-2 border-dashed border-line bg-mint/60 p-3 text-sm text-muted transition-colors file:mr-4 file:cursor-pointer file:rounded-full file:border-0 file:bg-leaf file:px-4 file:py-2 file:text-sm file:font-semibold file:text-canvas hover:border-leaf-bright disabled:opacity-50"
         />
       </Field>
       {extracting && (
@@ -517,7 +554,7 @@ export function DocumentStatus({
 }) {
   const ocrPages = doc.pages.filter((p) => p.method === "ocr").length;
   return (
-    <div className="space-y-2 rounded border border-neutral-200 p-3 text-sm dark:border-neutral-800">
+    <div className="space-y-2 rounded-2xl border border-line bg-mint/60 p-4 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium">{doc.filename ?? "document.pdf"}</span>
         <span className="text-neutral-500">
@@ -525,7 +562,7 @@ export function DocumentStatus({
           {doc.total_pages === 1 ? "" : "s"} read
         </span>
         {ocrPages > 0 && (
-          <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${TONE.warn}`}>
             OCR used on {ocrPages} page{ocrPages === 1 ? "" : "s"}
           </span>
         )}

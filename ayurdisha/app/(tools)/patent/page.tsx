@@ -29,8 +29,13 @@ import {
   Sources,
   SubmitButton,
   Verification,
+  formCardClass,
   inputClass,
 } from "@/components/ui";
+import { LoadingPanel } from "@/components/tool/LoadingPanel";
+import { PageHero } from "@/components/tool/PageHero";
+import { ResultsReveal } from "@/components/tool/ResultsReveal";
+import { useSourceScope } from "@/components/site/SourceScope";
 
 const SOURCE_DESCRIPTIONS: Record<LegalScope, string> = {
   domestic:
@@ -42,7 +47,7 @@ const SOURCE_DESCRIPTIONS: Record<LegalScope, string> = {
 export default function PatentAdvisorPage() {
   const [product, setProduct] = useState("");
   const [ingredients, setIngredients] = useState<string[]>([]);
-  const [legalScope, setLegalScope] = useState<LegalScope>("domestic");
+  const { scope: legalScope, setScope: setLegalScope } = useSourceScope();
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -125,8 +130,13 @@ export default function PatentAdvisorPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Patent Advisor</h1>
+    <div className="space-y-8">
+      <PageHero
+        eyebrow="Patent Advisor"
+        title="Can I patent this formulation?"
+        desc="Indian Patents Act Section 3 risk indicator, prior art, grant likelihood and IP route suggestions."
+        pose="proud"
+      />
       <ContextChip
         imported={bridge.imported}
         hasFormulation={!!bridge.formulation}
@@ -135,7 +145,7 @@ export default function PatentAdvisorPage() {
         onDetach={bridge.detach}
       />
 
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className={formCardClass}>
         <PdfUpload
           label="Upload disclosure (PDF)"
           hint="Optional. Scanned PDFs are OCR'd. Extracted product and ingredients pre-fill the form below for review."
@@ -182,7 +192,12 @@ export default function PatentAdvisorPage() {
 
       <StreamProgress steps={bridge.steps} active={loading} />
       {error && <ErrorBanner message={error} />}
-      {result && <Results r={result} />}
+      {loading && <LoadingPanel />}
+      {result && (
+        <ResultsReveal>
+          <Results r={result} />
+        </ResultsReveal>
+      )}
     </div>
   );
 }

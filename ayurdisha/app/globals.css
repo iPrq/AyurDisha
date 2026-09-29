@@ -1,25 +1,124 @@
 @import "tailwindcss";
 
+/* Light theme only: `dark:` utilities apply only under an explicit .dark
+   class, which the app never sets. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------------------------------------------------------------------------
+   AyurDisha design tokens.
+   Light sage/leaf palette with turmeric CTAs.
+   --------------------------------------------------------------------------- */
+
+html {
+  color-scheme: light;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --canvas: #f6faf4;
+  --mint: #e9f3ea;
+  --blob: #cfe8d3;
+  --surface: #ffffff;
+  --line: #dce8dd;
+  --ink: #14261c;
+  --muted: #4f6356;
+  --leaf: #1e6b43;
+  --leaf-bright: #2f9e5b;
+  --turmeric: #f2a93b;
+  --turmeric-deep: #e0922a;
+  --turmeric-ink: #8a520a;
+  --clay: #d0643a;
+  --sky: #5b8def;
+  --shadow-soft: 0 12px 40px -12px rgb(20 38 28 / 0.18);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--canvas);
+  --color-foreground: var(--ink);
+  --color-canvas: var(--canvas);
+  --color-mint: var(--mint);
+  --color-blob: var(--blob);
+  --color-surface: var(--surface);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-leaf: var(--leaf);
+  --color-leaf-bright: var(--leaf-bright);
+  --color-turmeric: var(--turmeric);
+  --color-turmeric-deep: var(--turmeric-deep);
+  --color-turmeric-ink: var(--turmeric-ink);
+  --color-clay: var(--clay);
+  --color-sky: var(--sky);
+  --shadow-soft: var(--shadow-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-jakarta);
+  --font-devanagari: var(--font-noto-devanagari);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Retint Tailwind's neutral and green scales so existing tool-page classes
+   pick up the sage/leaf palette without rewriting every component. */
+@theme {
+  --color-neutral-50: #f4f8f3;
+  --color-neutral-100: #e8f0e7;
+  --color-neutral-200: #d7e3d6;
+  --color-neutral-300: #bccdbb;
+  --color-neutral-400: #8fa592;
+  --color-neutral-500: #66806b;
+  --color-neutral-600: #4d6553;
+  --color-neutral-700: #384d3e;
+  --color-neutral-800: #22342a;
+  --color-neutral-900: #16241c;
+  --color-neutral-950: #0d1812;
+
+  --color-green-50: #eef8f0;
+  --color-green-100: #d7efdd;
+  --color-green-200: #b2dfbd;
+  --color-green-300: #84c99a;
+  --color-green-400: #5cc98a;
+  --color-green-500: #2f9e5b;
+  --color-green-600: #27854c;
+  --color-green-700: #1e6b43;
+  --color-green-800: #185536;
+  --color-green-900: #13432b;
+  --color-green-950: #0a2618;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+::selection {
+  background: var(--turmeric);
+  color: #14261c;
+}
+
+:focus-visible {
+  outline: 2px solid var(--leaf-bright);
+  outline-offset: 2px;
+}
+
+/* Elements animated in by GSAP start hidden only when JS runs and motion is
+   allowed; GSAP reveals them with autoAlpha. Without JS or with reduced
+   motion they render normally. */
+@media (prefers-reduced-motion: no-preference) {
+  .js [data-reveal] {
+    visibility: hidden;
+  }
+}
+
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee {
+  animation: marquee 40s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee {
+    animation: none;
+  }
 }

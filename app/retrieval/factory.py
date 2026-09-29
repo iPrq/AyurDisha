@@ -66,14 +66,22 @@ def build_qdrant_retriever(settings: Settings) -> LegalRetriever:
     )
 
 
+_retriever: LegalRetriever | None = None
+
 def get_retriever(settings: Settings | None = None) -> LegalRetriever:
+    global _retriever
+    if _retriever is not None:
+        return _retriever
+
     cfg = settings or get_settings()
     backend = (cfg.retriever_backend or "").strip().lower()
     logger.info("Retriever backend=%s", backend)
     if backend == "mock":
-        return get_mock_retriever()
-    if backend == "qdrant":
-        return build_qdrant_retriever(cfg)
-    raise RetrievalConfigError(
-        f"Unsupported RETRIEVER_BACKEND={cfg.retriever_backend!r}; expected 'mock' or 'qdrant'."
-    )
+        _retriever = get_mock_retriever()
+    elif backend == "qdrant":
+        _retriever = build_qdrant_retriever(cfg)
+    else:
+        raise RetrievalConfigError(
+            f"Unsupported RETRIEVER_BACKEND={cfg.retriever_backend!r}; expected 'mock' or 'qdrant'."
+        )
+    return _retriever

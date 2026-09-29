@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { languageApi } from "@/lib/formulation/api";
 import { LANGUAGE_OPTIONS, type LanguageCapabilities } from "@/lib/formulation/types";
+import { Dishu } from "@/components/mascot/Dishu";
 import { RunCard } from "./ActivityTimeline";
 import { useAgent } from "./AgentProvider";
+import { DishaLauncher } from "./DishaLauncher";
 import { VoiceButton } from "./VoiceButton";
 
 const SLASH_COMMANDS = [
@@ -13,6 +15,21 @@ const SLASH_COMMANDS = [
   { cmd: "/patent", hint: "Run Patent Advisor on the formulation" },
   { cmd: "/abs", hint: "Check NBA / ABS applicability" },
   { cmd: "/evidence", hint: "Open the evidence panel" },
+];
+
+const HOW_IT_WORKS = [
+  {
+    title: "Describe your product",
+    desc: "Type it, or tap the mic and speak. Pick your language above.",
+  },
+  {
+    title: "Review the formulation",
+    desc: "I turn it into ingredients, quantities and parts. Nothing is analysed until you confirm.",
+  },
+  {
+    title: "Ask for a check",
+    desc: "Say “check patent risk” or “is ABS needed?”. I open the tool and run it, showing every step.",
+  },
 ];
 
 const EXAMPLES = [
@@ -71,27 +88,27 @@ export function AssistantDock() {
 
   if (!dockOpen) {
     return (
-      <button
-        type="button"
-        onClick={() => setDockOpen(true)}
-        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-green-800 px-4 py-2.5 text-sm font-medium text-white shadow-lg hover:bg-green-900"
-        aria-label="Open AyurDisha assistant"
-      >
-        <span className={`h-2 w-2 rounded-full ${activeRun ? "animate-pulse bg-amber-300" : "bg-green-300"}`} />
-        Assistant
-        <kbd className="rounded bg-green-900 px-1 text-[10px] text-green-200">Ctrl K</kbd>
-      </button>
+      <DishaLauncher
+        busy={!!activeRun || busy}
+        onOpen={() => {
+          setDockOpen(true);
+          setTimeout(() => inputRef.current?.focus(), 50);
+        }}
+      />
     );
   }
 
   return (
     <aside
       className="fixed bottom-0 right-0 top-0 z-40 flex w-full flex-col border-l border-neutral-200 bg-neutral-50 shadow-xl sm:w-[380px] dark:border-neutral-800 dark:bg-neutral-950"
-      aria-label="AyurDisha assistant"
+      aria-label="Disha, the AyurDisha assistant"
     >
       <header className="flex items-center gap-2 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-mint">
+          <Dishu pose={activeRun || busy ? "think" : "wave"} size={34} title="" />
+        </span>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-green-800 dark:text-green-400">AyurDisha Assistant</div>
+          <div className="font-display text-sm font-bold">Disha</div>
           <div className="truncate text-[11px] text-neutral-500">
             {formulation
               ? `Formulation v${formulation.version} · ${formulation.ingredients.length} ingredient${formulation.ingredients.length === 1 ? "" : "s"}`
@@ -128,11 +145,30 @@ export function AssistantDock() {
 
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-3">
         {messages.length === 0 && (
-          <div className="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
-            <p>
-              Describe a formulation or ask me to act on it. I update the formulation, open tools and run them — every
-              step is shown below as it actually happens.
+          <div className="space-y-4 text-sm text-neutral-600 dark:text-neutral-400">
+            <div>
+              <p className="font-display text-base font-bold text-ink">Hi, I&apos;m Disha.</p>
+              <p className="mt-1">
+                I can fill in the formulation and run the tools for you. Here&apos;s how it works:
+              </p>
+            </div>
+            <ol className="space-y-2.5">
+              {HOW_IT_WORKS.map((step, i) => (
+                <li key={step.title} className="disha-step flex gap-3">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-turmeric text-xs font-bold text-[#14261C]">
+                    {i + 1}
+                  </span>
+                  <span>
+                    <span className="block font-semibold text-ink">{step.title}</span>
+                    <span className="text-xs">{step.desc}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+            <p className="rounded-lg bg-mint px-3 py-2 text-xs">
+              Disha is optional. You can always use the forms on each page directly.
             </p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-ink">Try one</p>
             <div className="space-y-1">
               {EXAMPLES.map((ex) => (
                 <button
