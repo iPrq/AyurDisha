@@ -1,7 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  ContextChip,
+  FillRing,
+  StreamProgress,
+  useToolBridge,
+} from "@/components/formulation/ToolBridge";
 import { api } from "@/lib/api";
+import { toolStreams } from "@/lib/formulation/api";
 import { botanicalTerms } from "@/components/knowledge-graph/KnowledgeGraphProvider";
 import type {
   AbsPurpose,
@@ -48,6 +55,54 @@ export default function NbaAbsPage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<NbaAbsResponse | null>(null);
   const [doc, setDoc] = useState<ProductDocumentExtractResponse | null>(null);
+  const formRef = useRef({ product, ingredients, turnover, purpose, entityType, resourceSource, override, query });
+  useEffect(() => {
+    formRef.current = { product, ingredients, turnover, purpose, entityType, resourceSource, override, query };
+  });
+
+  const bridge = useToolBridge(
+    "nba-abs",
+    async ({ handlers, formulationId }) => {
+      const f = formRef.current;
+      setLoading(true);
+      setError(null);
+      setResult(null);
+      try {
+        const r = await toolStreams.nbaAbs(
+          {
+            product: f.product,
+            ingredients: f.ingredients,
+            annual_turnover_inr: f.turnover ? Number(f.turnover) : null,
+            purpose: f.purpose,
+            entity_type: f.entityType,
+            resource_source: f.resourceSource,
+            percentage_override: f.override ? Number(f.override) : null,
+            user_query: f.query || null,
+            formulation_id: formulationId,
+          },
+          handlers,
+        );
+        setResult(r);
+        const parts = [
+          r.applicability && `applicability ${r.applicability.status.toLowerCase().replaceAll("_", " ")}`,
+          r.calculation ? `fee ${inr(r.calculation.fee_inr)} (deterministic)` : "no fee calculated (turnover or rate not available)",
+        ].filter(Boolean);
+        return { summary: `ABS assessment complete: ${parts.join(", ")}` };
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    {
+      product: (v) => setProduct(String(v)),
+      ingredients: (v) => setIngredients(v as string[]),
+      purpose: (v) => setPurpose(v as AbsPurpose),
+      entity_type: (v) => setEntityType(v as EntityType),
+      resource_source: (v) => setResourceSource(v as ResourceSource),
+    },
+  );
 
   function onDoc(next: ProductDocumentExtractResponse | null) {
     setDoc(next);
@@ -72,6 +127,7 @@ export default function NbaAbsPage() {
           resource_source: resourceSource,
           percentage_override: override ? Number(override) : null,
           user_query: query || null,
+          formulation_id: bridge.imported?.formulationId ?? null,
         }),
       );
     } catch (err) {
@@ -84,6 +140,13 @@ export default function NbaAbsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold">NBA / ABS Calculator</h1>
+      <ContextChip
+        imported={bridge.imported}
+        hasFormulation={!!bridge.formulation}
+        currentVersion={bridge.formulation?.version ?? null}
+        onImport={bridge.importNow}
+        onDetach={bridge.detach}
+      />
 
       <form onSubmit={onSubmit} className="space-y-4">
         <PdfUpload
@@ -96,18 +159,22 @@ export default function NbaAbsPage() {
           disabled={loading}
           showText={false}
         />
-        <Field label="Product">
-          <input
-            required
-            className={inputClass}
-            value={product}
-            onChange={(e) => setProduct(e.target.value)}
-            placeholder="e.g. Brahmi memory tonic"
-          />
-        </Field>
-        <Field label="Ingredients">
-          <IngredientInput value={ingredients} onChange={setIngredients} />
-        </Field>
+        <FillRing active={bridge.filling === "product"}>
+          <Field label="Product">
+            <input
+              required
+              className={inputClass}
+              value={product}
+              onChange={(e) => setProduct(e.target.value)}
+              placeholder="e.g. Brahmi memory tonic"
+            />
+          </Field>
+        </FillRing>
+        <FillRing active={bridge.filling === "ingredients"}>
+          <Field label="Ingredients">
+            <IngredientInput value={ingredients} onChange={setIngredients} />
+          </Field>
+        </FillRing>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Annual turnover (INR)" hint="Optional, needed for fee">
             <input
@@ -134,43 +201,49 @@ export default function NbaAbsPage() {
           </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Purpose">
-            <select
-              className={inputClass}
-              value={purpose}
-              onChange={(e) => setPurpose(e.target.value as AbsPurpose)}
-            >
-              <option value="commercial_utilization">
-                Commercial utilization
-              </option>
-              <option value="research">Research</option>
-              <option value="bio_survey">Bio-survey</option>
-              <option value="ipr">IPR</option>
-            </select>
-          </Field>
-          <Field label="Entity type">
-            <select
-              className={inputClass}
-              value={entityType}
-              onChange={(e) => setEntityType(e.target.value as EntityType)}
-            >
-              <option value="indian">Indian</option>
-              <option value="foreign">Foreign</option>
-            </select>
-          </Field>
-          <Field label="Resource source">
-            <select
-              className={inputClass}
-              value={resourceSource}
-              onChange={(e) =>
-                setResourceSource(e.target.value as ResourceSource)
-              }
-            >
-              <option value="unknown">Unknown</option>
-              <option value="wild">Wild</option>
-              <option value="cultivated">Cultivated</option>
-            </select>
-          </Field>
+          <FillRing active={bridge.filling === "purpose"}>
+            <Field label="Purpose">
+              <select
+                className={inputClass}
+                value={purpose}
+                onChange={(e) => setPurpose(e.target.value as AbsPurpose)}
+              >
+                <option value="commercial_utilization">
+                  Commercial utilization
+                </option>
+                <option value="research">Research</option>
+                <option value="bio_survey">Bio-survey</option>
+                <option value="ipr">IPR</option>
+              </select>
+            </Field>
+          </FillRing>
+          <FillRing active={bridge.filling === "entity_type"}>
+            <Field label="Entity type">
+              <select
+                className={inputClass}
+                value={entityType}
+                onChange={(e) => setEntityType(e.target.value as EntityType)}
+              >
+                <option value="indian">Indian</option>
+                <option value="foreign">Foreign</option>
+              </select>
+            </Field>
+          </FillRing>
+          <FillRing active={bridge.filling === "resource_source"}>
+            <Field label="Resource source">
+              <select
+                className={inputClass}
+                value={resourceSource}
+                onChange={(e) =>
+                  setResourceSource(e.target.value as ResourceSource)
+                }
+              >
+                <option value="unknown">Unknown</option>
+                <option value="wild">Wild</option>
+                <option value="cultivated">Cultivated</option>
+              </select>
+            </Field>
+          </FillRing>
         </div>
         <Field label="Question" hint="Optional">
           <textarea
@@ -183,6 +256,7 @@ export default function NbaAbsPage() {
         <SubmitButton loading={loading} />
       </form>
 
+      <StreamProgress steps={bridge.steps} active={loading} />
       {error && <ErrorBanner message={error} />}
       {result && <Results r={result} />}
     </div>

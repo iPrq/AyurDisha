@@ -80,6 +80,7 @@ export interface ProductReviewRequest {
   product_category?: string | null;
   user_query?: string | null;
   document_text?: string | null;
+  formulation_id?: string | null;
 }
 
 export interface ProductDocumentExtractResponse extends DocumentExtractResponse {
@@ -140,6 +141,7 @@ export interface PatentAdvisorRequest {
   legal_scope: LegalScope;
   user_query?: string | null;
   document_text?: string | null;
+  formulation_id?: string | null;
 }
 
 export interface PdfPageInfo {
@@ -242,6 +244,7 @@ export interface NbaAbsRequest {
   resource_source: ResourceSource;
   percentage_override?: number | null;
   user_query?: string | null;
+  formulation_id?: string | null;
 }
 
 export interface NbaAbsResponse extends BaseResponse {

@@ -1,7 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  ContextChip,
+  FillRing,
+  StreamProgress,
+  useToolBridge,
+} from "@/components/formulation/ToolBridge";
 import { api } from "@/lib/api";
+import { toolStreams } from "@/lib/formulation/api";
 import {
   botanicalTerms,
   EntityLink,
@@ -48,7 +55,53 @@ export default function ProductReviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProductReviewResponse | null>(null);
   const [doc, setDoc] = useState<ProductDocumentExtractResponse | null>(null);
+  const formRef = useRef({ product, ingredients, category, targetMarket, legalScope, query, doc });
+  useEffect(() => {
+    formRef.current = { product, ingredients, category, targetMarket, legalScope, query, doc };
+  });
 
+  const bridge = useToolBridge(
+    "review",
+    async ({ handlers, formulationId }) => {
+      const f = formRef.current;
+      setLoading(true);
+      setError(null);
+      setResult(null);
+      try {
+        const r = await toolStreams.review(
+          {
+            product: f.product,
+            ingredients: f.ingredients,
+            legal_scope: f.legalScope,
+            product_category: f.category || null,
+            target_market: f.targetMarket || null,
+            user_query: f.query || null,
+            document_text: f.doc?.document_text ?? null,
+            formulation_id: formulationId,
+          },
+          handlers,
+        );
+        setResult(r);
+        const ratings = [
+          r.market_feasibility && `market ${r.market_feasibility.rating.toLowerCase()}`,
+          r.legal_compliance && `legal ${r.legal_compliance.rating.toLowerCase()}`,
+          r.resource_accessibility && `resources ${r.resource_accessibility.rating.toLowerCase()}`,
+        ].filter(Boolean);
+        return { summary: `Review complete: ${ratings.join(", ").replaceAll("_", " ")}` };
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    {
+      product: (v) => setProduct(String(v)),
+      ingredients: (v) => setIngredients(v as string[]),
+      target_market: (v) => setTargetMarket(String(v)),
+      legal_scope: (v) => setLegalScope(v as LegalScope),
+    },
+  );
   function onDoc(next: ProductDocumentExtractResponse | null) {
     setDoc(next);
     if (!next) return;
@@ -72,6 +125,7 @@ export default function ProductReviewPage() {
           target_market: targetMarket || null,
           user_query: query || null,
           document_text: doc?.document_text ?? null,
+          formulation_id: bridge.imported?.formulationId ?? null,
         }),
       );
     } catch (err) {
@@ -84,6 +138,13 @@ export default function ProductReviewPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold">Product Review</h1>
+      <ContextChip
+        imported={bridge.imported}
+        hasFormulation={!!bridge.formulation}
+        currentVersion={bridge.formulation?.version ?? null}
+        onImport={bridge.importNow}
+        onDetach={bridge.detach}
+      />
 
       <form onSubmit={onSubmit} className="space-y-4">
         <PdfUpload
@@ -95,23 +156,29 @@ export default function ProductReviewPage() {
           onError={setError}
           disabled={loading}
         />
-        <Field label="Product">
-          <input
-            required
-            className={inputClass}
-            value={product}
-            onChange={(e) => setProduct(e.target.value)}
-            placeholder="e.g. Ashwagandha stress-relief capsules"
+        <FillRing active={bridge.filling === "product"}>
+          <Field label="Product">
+            <input
+              required
+              className={inputClass}
+              value={product}
+              onChange={(e) => setProduct(e.target.value)}
+              placeholder="e.g. Ashwagandha stress-relief capsules"
+            />
+          </Field>
+        </FillRing>
+        <FillRing active={bridge.filling === "ingredients"}>
+          <Field label="Ingredients">
+            <IngredientInput value={ingredients} onChange={setIngredients} />
+          </Field>
+        </FillRing>
+        <FillRing active={bridge.filling === "legal_scope"}>
+          <SourceScopeToggle
+            value={legalScope}
+            onChange={setLegalScope}
+            descriptions={SOURCE_DESCRIPTIONS}
           />
-        </Field>
-        <Field label="Ingredients">
-          <IngredientInput value={ingredients} onChange={setIngredients} />
-        </Field>
-        <SourceScopeToggle
-          value={legalScope}
-          onChange={setLegalScope}
-          descriptions={SOURCE_DESCRIPTIONS}
-        />
+        </FillRing>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Product category" hint="Optional">
             <input
@@ -121,16 +188,18 @@ export default function ProductReviewPage() {
               placeholder="e.g. health supplement"
             />
           </Field>
-          <Field
-            label="Target market"
-            hint={`Optional, defaults to ${legalScope === "international" ? "global" : "India"}`}
-          >
-            <input
-              className={inputClass}
-              value={targetMarket}
-              onChange={(e) => setTargetMarket(e.target.value)}
-            />
-          </Field>
+          <FillRing active={bridge.filling === "target_market"}>
+            <Field
+              label="Target market"
+              hint={`Optional, defaults to ${legalScope === "international" ? "global" : "India"}`}
+            >
+              <input
+                className={inputClass}
+                value={targetMarket}
+                onChange={(e) => setTargetMarket(e.target.value)}
+              />
+            </Field>
+          </FillRing>
         </div>
         <Field label="Question" hint="Optional">
           <textarea
@@ -143,6 +212,7 @@ export default function ProductReviewPage() {
         <SubmitButton loading={loading} />
       </form>
 
+      <StreamProgress steps={bridge.steps} active={loading} />
       {error && <ErrorBanner message={error} />}
       {result && <Results r={result} />}
     </div>

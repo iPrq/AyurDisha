@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, TypedDict
+from typing import Annotated, Any, TypedDict
 
 from typing_extensions import NotRequired
 
@@ -54,6 +54,11 @@ class PatentAdvisorState(TypedDict):
     user_query: NotRequired[str]
     # Uploaded disclosure text (prompt context only, never evidence)
     document_text: NotRequired[str]
+    # Formulation Intelligence hand-off (absent in manual use)
+    formulation_id: NotRequired[str]
+    botanicals_prefilled: NotRequired[bool]
+    botanicals: NotRequired[list[BotanicalResult]]
+    retrieval_synonyms: NotRequired[list[str]]
 
     # Parsed / normalized input (InputParser)
     botanical_input: NotRequired[str]
@@ -108,6 +113,9 @@ class ProductReviewState(TypedDict):
     user_query: NotRequired[str]
     # Uploaded product document text (prompt context only, never evidence)
     document_text: NotRequired[str]
+    formulation_id: NotRequired[str]
+    botanicals_prefilled: NotRequired[bool]
+    retrieval_synonyms: NotRequired[list[str]]
 
     botanical_input: NotRequired[str]
     parsed_notes: NotRequired[str]
@@ -151,6 +159,10 @@ class NbaAbsState(TypedDict):
     annual_turnover_inr: NotRequired[float]
     percentage_override: NotRequired[float]
     user_query: NotRequired[str]
+    document_text: NotRequired[str]
+    formulation_id: NotRequired[str]
+    botanicals_prefilled: NotRequired[bool]
+    retrieval_synonyms: NotRequired[list[str]]
 
     botanical_input: NotRequired[str]
     parsed_notes: NotRequired[str]
@@ -175,4 +187,27 @@ class NbaAbsState(TypedDict):
 
     retry_count: NotRequired[int]
     final_answer: NotRequired[str]
+    error: NotRequired[str]
+
+
+class FormulationState(TypedDict):
+    """State for the Formulation Intelligence workflow (context → structured, verified map).
+
+    Formulation objects are Pydantic models from ``graph.formulation.models``; typed as ``Any``
+    here to avoid an import cycle with this module.
+    """
+
+    formulation: Any
+    raw_text: NotRequired[str]
+    language: NotRequired[str]
+    normalized_text: NotRequired[str]
+    language_method: NotRequired[str]
+    extraction_method: NotRequired[str]
+    extraction_dropped: NotRequired[list[str]]
+    source_pairs: NotRequired[list[Any]]
+    empty_branches: NotRequired[list[str]]
+    graph: NotRequired[Any]
+    graph_claims: NotRequired[list[Any]]
+    suggested_actions: NotRequired[list[dict[str, Any]]]
+    escalation_reasons: Annotated[list[str], merge_unique]
     error: NotRequired[str]

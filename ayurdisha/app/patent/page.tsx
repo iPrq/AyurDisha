@@ -1,7 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  ContextChip,
+  FillRing,
+  StreamProgress,
+  useToolBridge,
+} from "@/components/formulation/ToolBridge";
 import { api } from "@/lib/api";
+import { toolStreams } from "@/lib/formulation/api";
 import { botanicalTerms } from "@/components/knowledge-graph/KnowledgeGraphProvider";
 import type {
   LegalScope,
@@ -41,6 +48,51 @@ export default function PatentAdvisorPage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PatentAdvisorResponse | null>(null);
   const [doc, setDoc] = useState<PatentDocumentExtractResponse | null>(null);
+  const formRef = useRef({ product, ingredients, legalScope, query, doc });
+  useEffect(() => {
+    formRef.current = { product, ingredients, legalScope, query, doc };
+  });
+
+  const bridge = useToolBridge(
+    "patent",
+    async ({ handlers, formulationId }) => {
+      const f = formRef.current;
+      setLoading(true);
+      setError(null);
+      setResult(null);
+      try {
+        const r = await toolStreams.patent(
+          {
+            product: f.product,
+            ingredients: f.ingredients,
+            legal_scope: f.legalScope,
+            user_query: f.query || null,
+            document_text: f.doc?.document_text ?? null,
+            formulation_id: formulationId,
+          },
+          handlers,
+        );
+        setResult(r);
+        const triggered = r.patentability_risk?.triggered_clauses ?? [];
+        const priorArt = r.prior_art?.findings.length ?? 0;
+        const parts = [
+          r.section3 && (triggered.length ? `Section 3 clauses flagged: ${triggered.join(", ")}` : "no Section 3 clause flagged"),
+          `${priorArt} prior-art finding${priorArt === 1 ? "" : "s"}`,
+        ].filter(Boolean);
+        return { summary: `Patent analysis complete${parts.length ? `: ${parts.join(", ")}` : ""}` };
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    {
+      product: (v) => setProduct(String(v)),
+      ingredients: (v) => setIngredients(v as string[]),
+      legal_scope: (v) => setLegalScope(v as LegalScope),
+    },
+  );
 
   function onDoc(next: PatentDocumentExtractResponse | null) {
     setDoc(next);
@@ -62,6 +114,7 @@ export default function PatentAdvisorPage() {
           legal_scope: legalScope,
           user_query: query || null,
           document_text: doc?.document_text ?? null,
+          formulation_id: bridge.imported?.formulationId ?? null,
         }),
       );
     } catch (err) {
@@ -74,6 +127,13 @@ export default function PatentAdvisorPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold">Patent Advisor</h1>
+      <ContextChip
+        imported={bridge.imported}
+        hasFormulation={!!bridge.formulation}
+        currentVersion={bridge.formulation?.version ?? null}
+        onImport={bridge.importNow}
+        onDetach={bridge.detach}
+      />
 
       <form onSubmit={onSubmit} className="space-y-4">
         <PdfUpload
@@ -86,23 +146,29 @@ export default function PatentAdvisorPage() {
           disabled={loading}
         />
 
-        <Field label="Product / invention">
-          <input
-            required
-            className={inputClass}
-            value={product}
-            onChange={(e) => setProduct(e.target.value)}
-            placeholder="e.g. Turmeric-based anti-inflammatory gel"
+        <FillRing active={bridge.filling === "product"}>
+          <Field label="Product / invention">
+            <input
+              required
+              className={inputClass}
+              value={product}
+              onChange={(e) => setProduct(e.target.value)}
+              placeholder="e.g. Turmeric-based anti-inflammatory gel"
+            />
+          </Field>
+        </FillRing>
+        <FillRing active={bridge.filling === "ingredients"}>
+          <Field label="Ingredients">
+            <IngredientInput value={ingredients} onChange={setIngredients} />
+          </Field>
+        </FillRing>
+        <FillRing active={bridge.filling === "legal_scope"}>
+          <SourceScopeToggle
+            value={legalScope}
+            onChange={setLegalScope}
+            descriptions={SOURCE_DESCRIPTIONS}
           />
-        </Field>
-        <Field label="Ingredients">
-          <IngredientInput value={ingredients} onChange={setIngredients} />
-        </Field>
-        <SourceScopeToggle
-          value={legalScope}
-          onChange={setLegalScope}
-          descriptions={SOURCE_DESCRIPTIONS}
-        />
+        </FillRing>
         <Field label="Question" hint="Optional">
           <textarea
             className={inputClass}
@@ -114,6 +180,7 @@ export default function PatentAdvisorPage() {
         <SubmitButton loading={loading} />
       </form>
 
+      <StreamProgress steps={bridge.steps} active={loading} />
       {error && <ErrorBanner message={error} />}
       {result && <Results r={result} />}
     </div>

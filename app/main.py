@@ -1,4 +1,4 @@
-"""AyurDisha FastAPI application — Product Review, Patent Advisor, NBA / ABS."""
+"""AyurDisha FastAPI application — Formulation Intelligence, Product Review, Patent Advisor, NBA / ABS."""
 
 from __future__ import annotations
 
@@ -7,7 +7,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from api.formulation import get_graph as get_formulation_graph
+from api.formulation import router as formulation_router
 from api.knowledge_graph import router as knowledge_graph_router
+from api.language import router as language_router
 from api.nba_abs import get_graph as get_nba_abs_graph
 from api.nba_abs import router as nba_abs_router
 from api.patent_advisor import get_graph
@@ -28,6 +31,7 @@ async def lifespan(_: FastAPI):
     if settings.retriever_backend != "mock":
         get_graph()
         get_nba_abs_graph()
+        get_formulation_graph()
     if settings.retriever_backend != "mock" or settings.web_search_backend != "mock":
         get_product_review_graph()
     yield
@@ -48,6 +52,8 @@ app.include_router(product_review_router)
 app.include_router(patent_advisor_router)
 app.include_router(nba_abs_router)
 app.include_router(knowledge_graph_router)
+app.include_router(formulation_router)
+app.include_router(language_router)
 
 
 @app.get("/health")

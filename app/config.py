@@ -107,6 +107,23 @@ class Settings(BaseModel):
     # Write each pipeline response (product, herbs, sources) into the graph
     kg_record_responses: bool = Field(default=True)
 
+    # BHASHINI (optional language / voice layer). Service IDs are discovered, not configured,
+    # unless an explicit override is set.
+    bhashini_enabled: bool = Field(default=False)
+    bhashini_user_id: str | None = Field(default=None)
+    bhashini_api_key: str | None = Field(default=None)
+    bhashini_base_url: str = Field(
+        default="https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/getModelsPipeline"
+    )
+    bhashini_pipeline_id: str | None = Field(default="64392f96daac500b55c543cd")
+    bhashini_default_source_language: str = Field(default="en")
+    bhashini_default_target_language: str = Field(default="en")
+    bhashini_asr_service: str | None = Field(default=None)
+    bhashini_translation_service: str | None = Field(default=None)
+    bhashini_tts_service: str | None = Field(default=None)
+    bhashini_timeout: float = Field(default=20.0)
+    audio_max_bytes: int = Field(default=5 * 1024 * 1024)
+
     def redacted(self) -> dict[str, object]:
         """Settings dump safe for logs (secrets masked)."""
         data = self.model_dump()
@@ -117,6 +134,8 @@ class Settings(BaseModel):
             "google_cse_api_key",
             "tavily_api_key",
             "neo4j_password",
+            "bhashini_api_key",
+            "bhashini_user_id",
         ):
             data[key] = "***" if data.get(key) else None
         return data
@@ -225,4 +244,20 @@ def get_settings() -> Settings:
         kg_auto_seed=_env_bool("KG_AUTO_SEED", True),
         kg_corpus_dir=_env_str("KG_CORPUS_DIR", "./data/raw/corpus") or "./data/raw/corpus",
         kg_record_responses=_env_bool("KG_RECORD_RESPONSES", True),
+        bhashini_enabled=_env_bool("BHASHINI_ENABLED", False),
+        bhashini_user_id=_env_str("BHASHINI_USER_ID"),
+        bhashini_api_key=_env_str("BHASHINI_API_KEY"),
+        bhashini_base_url=_env_str(
+            "BHASHINI_BASE_URL",
+            "https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/getModelsPipeline",
+        )
+        or "https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/getModelsPipeline",
+        bhashini_pipeline_id=_env_str("BHASHINI_PIPELINE_ID", "64392f96daac500b55c543cd"),
+        bhashini_default_source_language=_env_str("BHASHINI_DEFAULT_SOURCE_LANGUAGE", "en") or "en",
+        bhashini_default_target_language=_env_str("BHASHINI_DEFAULT_TARGET_LANGUAGE", "en") or "en",
+        bhashini_asr_service=_env_str("BHASHINI_ASR_SERVICE"),
+        bhashini_translation_service=_env_str("BHASHINI_TRANSLATION_SERVICE"),
+        bhashini_tts_service=_env_str("BHASHINI_TTS_SERVICE"),
+        bhashini_timeout=_env_float("BHASHINI_TIMEOUT", 20.0),
+        audio_max_bytes=_env_int("AUDIO_MAX_BYTES", 5 * 1024 * 1024),
     )

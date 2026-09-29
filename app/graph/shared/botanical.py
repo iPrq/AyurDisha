@@ -149,8 +149,13 @@ def botanical_normalizer_node(
     settings: Settings | None = None,
     llm: Any | None = None,
 ) -> dict[str, Any]:
-    term = _resolve_input_term(state)
-    result = normalize_botanical(term, kg=kg, settings=settings, llm=llm)
+    prefilled = state.get("botanical") if state.get("botanicals_prefilled") else None
+    if prefilled is not None:
+        term = prefilled.input_term
+        result = prefilled
+    else:
+        term = _resolve_input_term(state)
+        result = normalize_botanical(term, kg=kg, settings=settings, llm=llm)
 
     update: dict[str, Any] = {
         "botanical_input": term,
@@ -189,10 +194,13 @@ def multi_botanical_normalizer_node(
     llm: Any | None = None,
 ) -> dict[str, Any]:
     """Normalize every ingredient (Product Review / NBA-ABS need all resources)."""
-    results = [
-        normalize_botanical(term, kg=kg, settings=settings, llm=llm)
-        for term in resolve_ingredient_terms(state)
-    ]
+    if state.get("botanicals_prefilled") and state.get("botanicals"):
+        results = list(state["botanicals"])
+    else:
+        results = [
+            normalize_botanical(term, kg=kg, settings=settings, llm=llm)
+            for term in resolve_ingredient_terms(state)
+        ]
     update: dict[str, Any] = {"botanicals": results}
     if not results:
         update["botanical_status"] = BotanicalStatus.UNRESOLVED.value

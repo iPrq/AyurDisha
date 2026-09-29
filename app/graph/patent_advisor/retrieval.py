@@ -34,6 +34,8 @@ def _build_query(state: PatentAdvisorState) -> str:
         parts.append(str(state["product"]))
     ingredients = state.get("ingredients") or []
     parts.extend(str(i) for i in ingredients)
+    # Canonical synonyms from Formulation Intelligence (only set on formulation hand-off).
+    parts.extend(str(s) for s in state.get("retrieval_synonyms") or [])
     scope = state.get("legal_scope") or "domestic"
     if str(scope).lower() == "international":
         parts.append("comparative international IP patentable subject matter")

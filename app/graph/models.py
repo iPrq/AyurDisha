@@ -374,6 +374,10 @@ class PatentAdvisorRequest(BaseModel):
         max_length=200_000,
         description="Text extracted from an uploaded disclosure PDF; context only, never evidence",
     )
+    formulation_id: str | None = Field(
+        default=None,
+        description="Formulation Intelligence context to reuse (resolved botanicals, formulation summary)",
+    )
 
 
 class PatentDocumentFields(BaseModel):
@@ -539,6 +543,10 @@ class ProductReviewRequest(BaseModel):
         max_length=200_000,
         description="Text extracted from an uploaded product document PDF; context only, never evidence",
     )
+    formulation_id: str | None = Field(
+        default=None,
+        description="Formulation Intelligence context to reuse (resolved botanicals, formulation summary)",
+    )
 
 
 class ProductReviewResponse(BaseModel):
@@ -651,6 +659,10 @@ class NbaAbsRequest(BaseModel):
     language: str = "en"
     jurisdiction: str = "india"
     user_query: str | None = None
+    formulation_id: str | None = Field(
+        default=None,
+        description="Formulation Intelligence context to reuse (resolved biological resources)",
+    )
 
 
 class NbaAbsResponse(BaseModel):

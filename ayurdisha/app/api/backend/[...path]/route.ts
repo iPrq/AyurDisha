@@ -16,15 +16,26 @@ async function proxy(
       method: req.method,
       headers: {
         "Content-Type": req.headers.get("content-type") ?? "application/json",
+        Accept: req.headers.get("accept") ?? "*/*",
       },
       body: hasBody ? await req.arrayBuffer() : undefined,
       cache: "no-store",
+      signal: req.signal,
     });
-    return new Response(await res.text(), {
+    const contentType = res.headers.get("Content-Type") ?? "application/json";
+    if (contentType.startsWith("text/event-stream") && res.body) {
+      return new Response(res.body, {
+        status: res.status,
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache, no-transform",
+          "X-Accel-Buffering": "no",
+        },
+      });
+    }
+    return new Response(await res.arrayBuffer(), {
       status: res.status,
-      headers: {
-        "Content-Type": res.headers.get("Content-Type") ?? "application/json",
-      },
+      headers: { "Content-Type": contentType },
     });
   } catch {
     return Response.json(
@@ -34,4 +45,4 @@ async function proxy(
   }
 }
 
-export { proxy as GET, proxy as POST };
+export { proxy as GET, proxy as POST, proxy as PATCH, proxy as DELETE };

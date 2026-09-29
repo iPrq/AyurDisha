@@ -5,8 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 
+from api.formulation_context import hydrate_from_formulation
 from api.pdf_upload import extract_product_document
+from api.streaming import SSE_HEADERS, stream_graph
 from config import get_settings
 from graph.models import NbaAbsRequest, NbaAbsResponse, ProductDocumentExtractResponse
 from graph.nba_abs_graph import build_nba_abs_graph
@@ -51,26 +54,32 @@ def state_to_response(state: dict[str, Any], request: NbaAbsRequest) -> NbaAbsRe
     )
 
 
+def build_initial(request: NbaAbsRequest) -> dict[str, Any]:
+    initial: dict[str, Any] = {
+        "product": request.product,
+        "ingredients": list(request.ingredients),
+        "language": request.language,
+        "jurisdiction": request.jurisdiction,
+        "purpose": request.purpose,
+        "entity_type": request.entity_type,
+        "resource_source": request.resource_source,
+    }
+    if request.annual_turnover_inr is not None:
+        initial["annual_turnover_inr"] = request.annual_turnover_inr
+    if request.percentage_override is not None:
+        initial["percentage_override"] = request.percentage_override
+    if request.user_query:
+        initial["user_query"] = request.user_query
+    if request.formulation_id:
+        hydrate_from_formulation(initial, request.formulation_id, request.ingredients)
+    return initial
+
+
 @router.post("/nba-abs", response_model=NbaAbsResponse)
 def nba_abs(request: NbaAbsRequest, background_tasks: BackgroundTasks) -> NbaAbsResponse:
     """ABS applicability + source-grounded rate + deterministic fee (decision support)."""
+    initial = build_initial(request)
     try:
-        initial: dict[str, Any] = {
-            "product": request.product,
-            "ingredients": list(request.ingredients),
-            "language": request.language,
-            "jurisdiction": request.jurisdiction,
-            "purpose": request.purpose,
-            "entity_type": request.entity_type,
-            "resource_source": request.resource_source,
-        }
-        if request.annual_turnover_inr is not None:
-            initial["annual_turnover_inr"] = request.annual_turnover_inr
-        if request.percentage_override is not None:
-            initial["percentage_override"] = request.percentage_override
-        if request.user_query:
-            initial["user_query"] = request.user_query
-
         result = get_graph().invoke(initial)
         response = state_to_response(result, request)
         background_tasks.add_task(record_response, response, feature="nba_abs")
@@ -82,6 +91,23 @@ def nba_abs(request: NbaAbsRequest, background_tasks: BackgroundTasks) -> NbaAbs
                 detail="The LLM provider is temporarily overloaded. Please retry in a minute.",
             ) from exc
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/nba-abs/stream")
+def nba_abs_stream(request: NbaAbsRequest) -> StreamingResponse:
+    """Same workflow as POST /nba-abs, streamed as SSE node-progress events."""
+    initial = build_initial(request)
+    return StreamingResponse(
+        stream_graph(
+            get_graph(),
+            initial,
+            workflow="nba_abs",
+            to_response=lambda state: state_to_response(state, request),
+            on_complete=lambda response: record_response(response, feature="nba_abs"),
+        ),
+        media_type="text/event-stream",
+        headers=SSE_HEADERS,
+    )
 
 
 @router.post("/nba-abs/extract", response_model=ProductDocumentExtractResponse)

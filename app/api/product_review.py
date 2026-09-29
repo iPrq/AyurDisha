@@ -5,9 +5,12 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 
+from api.formulation_context import hydrate_from_formulation
 from api.patent_advisor import _to_legal_scope
 from api.pdf_upload import extract_product_document
+from api.streaming import SSE_HEADERS, stream_graph
 from config import get_settings
 from graph.models import (
     ProductDocumentExtractResponse,
@@ -60,28 +63,34 @@ def state_to_response(
     )
 
 
+def build_initial(request: ProductReviewRequest) -> dict[str, Any]:
+    initial: dict[str, Any] = {
+        "product": request.product,
+        "ingredients": list(request.ingredients),
+        "language": request.language,
+        "jurisdiction": request.jurisdiction,
+        "legal_scope": request.legal_scope,
+    }
+    if request.target_market:
+        initial["target_market"] = request.target_market
+    if request.product_category:
+        initial["product_category"] = request.product_category
+    if request.user_query:
+        initial["user_query"] = request.user_query
+    if request.document_text and request.document_text.strip():
+        initial["document_text"] = request.document_text
+    if request.formulation_id:
+        hydrate_from_formulation(initial, request.formulation_id, request.ingredients)
+    return initial
+
+
 @router.post("/product-review", response_model=ProductReviewResponse)
 def product_review(
     request: ProductReviewRequest, background_tasks: BackgroundTasks
 ) -> ProductReviewResponse:
     """Market feasibility, legal compliance and resource accessibility (decision support)."""
+    initial = build_initial(request)
     try:
-        initial: dict[str, Any] = {
-            "product": request.product,
-            "ingredients": list(request.ingredients),
-            "language": request.language,
-            "jurisdiction": request.jurisdiction,
-            "legal_scope": request.legal_scope,
-        }
-        if request.target_market:
-            initial["target_market"] = request.target_market
-        if request.product_category:
-            initial["product_category"] = request.product_category
-        if request.user_query:
-            initial["user_query"] = request.user_query
-        if request.document_text and request.document_text.strip():
-            initial["document_text"] = request.document_text
-
         result = get_graph().invoke(initial)
         response = state_to_response(result, request)
         background_tasks.add_task(record_response, response, feature="product_review")
@@ -93,6 +102,23 @@ def product_review(
                 detail="The LLM provider is temporarily overloaded. Please retry in a minute.",
             ) from exc
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/product-review/stream")
+def product_review_stream(request: ProductReviewRequest) -> StreamingResponse:
+    """Same workflow as POST /product-review, streamed as SSE node-progress events."""
+    initial = build_initial(request)
+    return StreamingResponse(
+        stream_graph(
+            get_graph(),
+            initial,
+            workflow="product_review",
+            to_response=lambda state: state_to_response(state, request),
+            on_complete=lambda response: record_response(response, feature="product_review"),
+        ),
+        media_type="text/event-stream",
+        headers=SSE_HEADERS,
+    )
 
 
 @router.post("/product-review/extract", response_model=ProductDocumentExtractResponse)

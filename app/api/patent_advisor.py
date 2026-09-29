@@ -6,8 +6,11 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, File, UploadFile
+from fastapi.responses import StreamingResponse
 
+from api.formulation_context import hydrate_from_formulation
 from api.pdf_upload import llm_http_error, read_pdf_upload
+from api.streaming import SSE_HEADERS, stream_graph
 from config import get_settings
 from graph.models import (
     LegalScope,
@@ -78,24 +81,30 @@ def state_to_response(state: dict[str, Any], request: PatentAdvisorRequest) -> P
     )
 
 
+def build_initial(request: PatentAdvisorRequest) -> dict[str, Any]:
+    initial: dict[str, Any] = {
+        "product": request.product,
+        "ingredients": list(request.ingredients),
+        "language": request.language,
+        "jurisdiction": request.jurisdiction,
+        "legal_scope": request.legal_scope,
+    }
+    if request.user_query:
+        initial["user_query"] = request.user_query
+    if request.document_text and request.document_text.strip():
+        initial["document_text"] = request.document_text
+    if request.formulation_id:
+        hydrate_from_formulation(initial, request.formulation_id, request.ingredients)
+    return initial
+
+
 @router.post("/patent-advisor", response_model=PatentAdvisorResponse)
 def patent_advisor(
     request: PatentAdvisorRequest, background_tasks: BackgroundTasks
 ) -> PatentAdvisorResponse:
     """Run Section 3 & Patent Advisor workflow (decision support, not legal advice)."""
+    initial = build_initial(request)
     try:
-        initial = {
-            "product": request.product,
-            "ingredients": list(request.ingredients),
-            "language": request.language,
-            "jurisdiction": request.jurisdiction,
-            "legal_scope": request.legal_scope,
-        }
-        if request.user_query:
-            initial["user_query"] = request.user_query
-        if request.document_text and request.document_text.strip():
-            initial["document_text"] = request.document_text
-
         result = get_graph().invoke(initial)
         response = state_to_response(result, request)
         background_tasks.add_task(record_response, response, feature="patent_advisor")
@@ -103,6 +112,23 @@ def patent_advisor(
     except Exception as exc:  # noqa: BLE001
         logger.exception("patent-advisor failed for product=%r", request.product)
         raise llm_http_error(exc) from exc
+
+
+@router.post("/patent-advisor/stream")
+def patent_advisor_stream(request: PatentAdvisorRequest) -> StreamingResponse:
+    """Same workflow as POST /patent-advisor, streamed as SSE node-progress events."""
+    initial = build_initial(request)
+    return StreamingResponse(
+        stream_graph(
+            get_graph(),
+            initial,
+            workflow="patent_advisor",
+            to_response=lambda state: state_to_response(state, request),
+            on_complete=lambda response: record_response(response, feature="patent_advisor"),
+        ),
+        media_type="text/event-stream",
+        headers=SSE_HEADERS,
+    )
 
 
 @router.post("/patent-advisor/extract", response_model=PatentDocumentExtractResponse)
