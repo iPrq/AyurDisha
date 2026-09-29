@@ -22,6 +22,14 @@ class Settings(BaseModel):
     nvidia_base_url: str = Field(default="https://integrate.api.nvidia.com/v1")
     llm_model: str = Field(default="meta/llama-3.1-70b-instruct")
     llm_temperature: float = Field(default=0.0)
+    # ChatNVIDIA defaults to 1024, which truncates large structured replies.
+    llm_max_tokens: int = Field(default=8192)
+    # Reasoning models (e.g. Nemotron 3) otherwise spend the token budget thinking before the JSON.
+    llm_thinking: bool = Field(default=False)
+    # Tried in order when the primary model errors (e.g. 503 overloaded).
+    llm_fallback_models: list[str] = Field(default_factory=list)
+    # Retries per LLM call on transient errors (429 / 5xx / timeouts), exponential backoff.
+    llm_max_retries: int = Field(default=3)
 
     # Defaults for Patent Advisor requests
     default_jurisdiction: str = Field(default="india")
@@ -133,6 +141,12 @@ def get_settings() -> Settings:
             os.getenv("NVIDIA_MODEL", "meta/llama-3.1-70b-instruct"),
         ),
         llm_temperature=_env_float("LLM_TEMPERATURE", 0.0),
+        llm_max_tokens=_env_int("LLM_MAX_TOKENS", 8192),
+        llm_thinking=_env_bool("LLM_THINKING", False),
+        llm_fallback_models=[
+            m.strip() for m in os.getenv("LLM_FALLBACK_MODELS", "").split(",") if m.strip()
+        ],
+        llm_max_retries=_env_int("LLM_MAX_RETRIES", 3),
         default_jurisdiction=os.getenv("DEFAULT_JURISDICTION", "india"),
         default_language=os.getenv("DEFAULT_LANGUAGE", "en"),
         default_legal_scope=os.getenv("DEFAULT_LEGAL_SCOPE", "domestic"),

@@ -8,6 +8,7 @@ dependencies = [
     "beautifulsoup4>=4.15.0",
     "fastapi>=0.141.1",
     "httpx>=0.28.1",
+    "json-repair>=0.63.5",
     "langchain>=1.4.2",
     "langchain-core>=1.6.4",
     "langchain-google-genai>=4.4.0",

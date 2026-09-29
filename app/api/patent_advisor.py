@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -10,7 +11,10 @@ from config import get_settings
 from graph.models import LegalScope, PatentAdvisorRequest, PatentAdvisorResponse
 from graph.patent_advisor_graph import build_patent_advisor_graph
 from knowledge_graph.factory import get_knowledge_graph
+from llm import is_transient_llm_error
 from retrieval.factory import get_retriever
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["patent-advisor"])
 
@@ -71,4 +75,10 @@ def patent_advisor(request: PatentAdvisorRequest) -> PatentAdvisorResponse:
         result = get_graph().invoke(initial)
         return state_to_response(result, request)
     except Exception as exc:  # noqa: BLE001
+        logger.exception("patent-advisor failed for product=%r", request.product)
+        if is_transient_llm_error(exc):
+            raise HTTPException(
+                status_code=503,
+                detail="The LLM provider is temporarily overloaded. Please retry in a minute.",
+            ) from exc
         raise HTTPException(status_code=500, detail=str(exc)) from exc

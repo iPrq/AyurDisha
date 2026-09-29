@@ -11,6 +11,7 @@ from config import get_settings
 from graph.models import ProductReviewRequest, ProductReviewResponse
 from graph.product_review_graph import build_product_review_graph
 from knowledge_graph.factory import get_knowledge_graph
+from llm import is_transient_llm_error
 from retrieval.factory import get_retriever
 from websearch.factory import get_web_searcher
 
@@ -74,4 +75,9 @@ def product_review(request: ProductReviewRequest) -> ProductReviewResponse:
         result = get_graph().invoke(initial)
         return state_to_response(result, request)
     except Exception as exc:  # noqa: BLE001
+        if is_transient_llm_error(exc):
+            raise HTTPException(
+                status_code=503,
+                detail="The LLM provider is temporarily overloaded. Please retry in a minute.",
+            ) from exc
         raise HTTPException(status_code=500, detail=str(exc)) from exc

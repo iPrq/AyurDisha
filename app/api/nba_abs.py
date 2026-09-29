@@ -10,6 +10,7 @@ from config import get_settings
 from graph.models import NbaAbsRequest, NbaAbsResponse
 from graph.nba_abs_graph import build_nba_abs_graph
 from knowledge_graph.factory import get_knowledge_graph
+from llm import is_transient_llm_error
 from retrieval.factory import get_retriever
 
 router = APIRouter(prefix="/api/v1", tags=["nba-abs"])
@@ -71,4 +72,9 @@ def nba_abs(request: NbaAbsRequest) -> NbaAbsResponse:
         result = get_graph().invoke(initial)
         return state_to_response(result, request)
     except Exception as exc:  # noqa: BLE001
+        if is_transient_llm_error(exc):
+            raise HTTPException(
+                status_code=503,
+                detail="The LLM provider is temporarily overloaded. Please retry in a minute.",
+            ) from exc
         raise HTTPException(status_code=500, detail=str(exc)) from exc

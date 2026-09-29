@@ -8,7 +8,8 @@ import pytest
 from langchain_core.messages import AIMessage
 
 from graph.models import Section3Clause, Section3Results
-from llm.structured import structured_invoke
+from llm import structured
+from llm.structured import is_transient_llm_error, structured_invoke
 
 
 class FakeChat:
@@ -50,6 +51,18 @@ def test_fallback_finds_json_after_prose():
     assert out.summary == "ok"
 
 
+def test_fallback_repairs_malformed_json():
+    reply = """{
+      // model commentary
+      'provisions': [{"clause": "3(k)", "triggered": false, "evidence_source_ids": ["s1"],},],
+      summary: "ok",
+    }"""
+    fake = FakeChat([reply])
+    out = structured_invoke(fake, Section3Results, system="s", user="u")
+    assert out.summary == "ok" and out.provisions[0].clause == Section3Clause.K
+    assert len(fake.calls) == 1
+
+
 def test_fallback_keeps_schema_validators():
     data = {"provisions": [{"clause": "3(g)", "triggered": True}], "summary": "x"}
     out = structured_invoke(FakeChat([json.dumps(data)]), Section3Results, system="s", user="u")
@@ -81,3 +94,41 @@ def test_structured_path_used_when_it_works():
     fake = Good([])
     assert structured_invoke(fake, Section3Results, system="s", user="u").summary == "ok"
     assert fake.calls == []
+
+
+class Overloaded(FakeChat):
+    """Structured output works, but the first ``failures`` calls hit a 503."""
+
+    def __init__(self, failures):
+        super().__init__([])
+        self.failures = failures
+        self.attempts = 0
+
+    def with_structured_output(self, schema):
+        outer = self
+
+        class _Flaky:
+            def invoke(self, messages):
+                outer.attempts += 1
+                if outer.attempts <= outer.failures:
+                    raise RuntimeError("[503] {'message': 'Service temporarily overloaded'}")
+                return Section3Results.model_validate(VALID)
+
+        return _Flaky()
+
+
+def test_transient_errors_are_retried(monkeypatch):
+    monkeypatch.setattr(structured, "_sleep", lambda _s: None)
+    fake = Overloaded(failures=2)
+    assert structured_invoke(fake, Section3Results, system="s", user="u").summary == "ok"
+    assert fake.attempts == 3 and fake.calls == []
+
+
+def test_transient_errors_raise_after_retries_without_json_fallback(monkeypatch):
+    monkeypatch.setattr(structured, "_sleep", lambda _s: None)
+    fake = Overloaded(failures=99)
+    with pytest.raises(RuntimeError, match="503"):
+        structured_invoke(fake, Section3Results, system="s", user="u")
+    assert fake.calls == []
+    assert is_transient_llm_error(RuntimeError("[503] overloaded"))
+    assert not is_transient_llm_error(RuntimeError("[400] unknown field `guided_json`"))
