@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type {
   BotanicalResult,
+  DocumentExtractResponse,
   RetrievedSource,
   ReviewFinding,
   VerificationResult,
@@ -366,5 +367,125 @@ export function FinalAnswer({
       )}
       <p className="text-xs text-neutral-500">{disclaimer}</p>
     </>
+  );
+}
+
+export function PdfUpload<T extends DocumentExtractResponse>({
+  label,
+  hint,
+  doc,
+  extract,
+  onChange,
+  onError,
+  disabled,
+  showText = true,
+}: {
+  label: string;
+  hint?: string;
+  doc: T | null;
+  extract: (file: File) => Promise<T>;
+  onChange: (doc: T | null) => void;
+  onError: (message: string | null) => void;
+  disabled?: boolean;
+  showText?: boolean;
+}) {
+  const [extracting, setExtracting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setExtracting(true);
+    onError(null);
+    try {
+      const extracted = await extract(file);
+      onChange({ ...extracted, filename: extracted.filename ?? file.name });
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+      if (fileRef.current) fileRef.current.value = "";
+    } finally {
+      setExtracting(false);
+    }
+  }
+
+  function remove() {
+    onChange(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  return (
+    <>
+      <Field label={label} hint={hint}>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/pdf"
+          disabled={extracting || disabled}
+          onChange={onFile}
+          className="block w-full text-sm file:mr-3 file:rounded file:border-0 file:bg-green-700 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-green-800 disabled:opacity-50"
+        />
+      </Field>
+      {extracting && (
+        <p className="text-sm text-neutral-500">
+          Extracting text (scanned pages may take a while)...
+        </p>
+      )}
+      {doc && !extracting && (
+        <DocumentStatus doc={doc} onRemove={remove} showText={showText} />
+      )}
+    </>
+  );
+}
+
+export function DocumentStatus({
+  doc,
+  onRemove,
+  showText = true,
+}: {
+  doc: DocumentExtractResponse;
+  onRemove: () => void;
+  showText?: boolean;
+}) {
+  const ocrPages = doc.pages.filter((p) => p.method === "ocr").length;
+  return (
+    <div className="space-y-2 rounded border border-neutral-200 p-3 text-sm dark:border-neutral-800">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium">{doc.filename ?? "document.pdf"}</span>
+        <span className="text-neutral-500">
+          {doc.pages.length} of {doc.total_pages} page
+          {doc.total_pages === 1 ? "" : "s"} read
+        </span>
+        {ocrPages > 0 && (
+          <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">
+            OCR used on {ocrPages} page{ocrPages === 1 ? "" : "s"}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={onRemove}
+          className="ml-auto text-xs text-neutral-500 hover:text-red-600"
+        >
+          Remove
+        </button>
+      </div>
+      {doc.truncated && (
+        <p className="text-xs text-amber-700">
+          Only the first {doc.pages.length} pages were processed.
+        </p>
+      )}
+      {showText && doc.summary && (
+        <p className="text-neutral-700 dark:text-neutral-300">{doc.summary}</p>
+      )}
+      {showText && (
+        <details>
+          <summary className="cursor-pointer text-xs text-neutral-500">
+            Extracted text ({doc.document_text.length.toLocaleString()} chars)
+          </summary>
+          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap text-xs text-neutral-600 dark:text-neutral-400">
+            {doc.document_text}
+          </pre>
+        </details>
+      )}
+    </div>
   );
 }

@@ -4,11 +4,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from api.patent_advisor import _to_legal_scope
+from api.pdf_upload import extract_product_document
 from config import get_settings
-from graph.models import ProductReviewRequest, ProductReviewResponse
+from graph.models import (
+    ProductDocumentExtractResponse,
+    ProductReviewRequest,
+    ProductReviewResponse,
+)
 from graph.product_review_graph import build_product_review_graph
 from knowledge_graph.factory import get_knowledge_graph
 from llm import is_transient_llm_error
@@ -71,6 +76,8 @@ def product_review(request: ProductReviewRequest) -> ProductReviewResponse:
             initial["product_category"] = request.product_category
         if request.user_query:
             initial["user_query"] = request.user_query
+        if request.document_text and request.document_text.strip():
+            initial["document_text"] = request.document_text
 
         result = get_graph().invoke(initial)
         return state_to_response(result, request)
@@ -81,3 +88,9 @@ def product_review(request: ProductReviewRequest) -> ProductReviewResponse:
                 detail="The LLM provider is temporarily overloaded. Please retry in a minute.",
             ) from exc
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/product-review/extract", response_model=ProductDocumentExtractResponse)
+def product_review_extract(file: UploadFile = File(...)) -> ProductDocumentExtractResponse:
+    """Extract text (with OCR for scanned pages) and form fields from a product document PDF."""
+    return extract_product_document(file)

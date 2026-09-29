@@ -6,6 +6,7 @@ import type {
   AbsPurpose,
   EntityType,
   NbaAbsResponse,
+  ProductDocumentExtractResponse,
   ResourceSource,
 } from "@/lib/types";
 import {
@@ -16,6 +17,7 @@ import {
   FinalAnswer,
   FindingList,
   IngredientInput,
+  PdfUpload,
   Section,
   SourceIds,
   Sources,
@@ -44,6 +46,14 @@ export default function NbaAbsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<NbaAbsResponse | null>(null);
+  const [doc, setDoc] = useState<ProductDocumentExtractResponse | null>(null);
+
+  function onDoc(next: ProductDocumentExtractResponse | null) {
+    setDoc(next);
+    if (!next) return;
+    if (next.product) setProduct(next.product);
+    if (next.ingredients.length) setIngredients(next.ingredients);
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,6 +85,16 @@ export default function NbaAbsPage() {
       <h1 className="text-xl font-semibold">NBA / ABS Calculator</h1>
 
       <form onSubmit={onSubmit} className="space-y-4">
+        <PdfUpload
+          label="Upload product document (PDF)"
+          hint="Optional. Only pre-fills product and ingredients below; the document is not sent with the calculation."
+          doc={doc}
+          extract={api.extractNbaAbsDocument}
+          onChange={onDoc}
+          onError={setError}
+          disabled={loading}
+          showText={false}
+        />
         <Field label="Product">
           <input
             required

@@ -79,6 +79,11 @@ export interface ProductReviewRequest {
   target_market?: string | null;
   product_category?: string | null;
   user_query?: string | null;
+  document_text?: string | null;
+}
+
+export interface ProductDocumentExtractResponse extends DocumentExtractResponse {
+  product_category: string;
 }
 
 export interface ProductReviewResponse extends BaseResponse {
@@ -143,7 +148,7 @@ export interface PdfPageInfo {
   chars: number;
 }
 
-export interface PatentDocumentExtractResponse {
+export interface DocumentExtractResponse {
   filename: string | null;
   product: string;
   ingredients: string[];
@@ -154,6 +159,8 @@ export interface PatentDocumentExtractResponse {
   ocr_used: boolean;
   truncated: boolean;
 }
+
+export type PatentDocumentExtractResponse = DocumentExtractResponse;
 
 export interface PatentAdvisorResponse extends BaseResponse {
   product: string;

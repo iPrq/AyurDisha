@@ -5,10 +5,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, UploadFile
 
+from api.pdf_upload import llm_http_error, read_pdf_upload
 from config import get_settings
-from documents import extract_pdf_text
 from graph.models import (
     LegalScope,
     PatentAdvisorRequest,
@@ -20,7 +20,6 @@ from graph.models import (
 from graph.patent_advisor_graph import build_patent_advisor_graph
 from graph.prompts import PATENT_DOC_EXTRACT_SYSTEM
 from knowledge_graph.factory import get_knowledge_graph
-from llm import is_transient_llm_error
 from llm.provider import get_chat_model
 from llm.structured import structured_invoke
 from retrieval.factory import get_retriever
@@ -31,8 +30,6 @@ router = APIRouter(prefix="/api/v1", tags=["patent-advisor"])
 
 _graph = None
 _extract_llm = None
-
-_PDF_CONTENT_TYPES = {"application/pdf", "application/x-pdf", "application/octet-stream"}
 
 
 def get_graph():
@@ -58,15 +55,6 @@ def _to_legal_scope(value: Any) -> LegalScope:
     if isinstance(value, LegalScope):
         return value
     return LegalScope(str(value).lower())
-
-
-def _llm_http_error(exc: Exception) -> HTTPException:
-    if is_transient_llm_error(exc):
-        return HTTPException(
-            status_code=503,
-            detail="The LLM provider is temporarily overloaded. Please retry in a minute.",
-        )
-    return HTTPException(status_code=500, detail=str(exc))
 
 
 def state_to_response(state: dict[str, Any], request: PatentAdvisorRequest) -> PatentAdvisorResponse:
@@ -109,30 +97,14 @@ def patent_advisor(request: PatentAdvisorRequest) -> PatentAdvisorResponse:
         return state_to_response(result, request)
     except Exception as exc:  # noqa: BLE001
         logger.exception("patent-advisor failed for product=%r", request.product)
-        raise _llm_http_error(exc) from exc
+        raise llm_http_error(exc) from exc
 
 
 @router.post("/patent-advisor/extract", response_model=PatentDocumentExtractResponse)
 def patent_advisor_extract(file: UploadFile = File(...)) -> PatentDocumentExtractResponse:
     """Extract text (with OCR for scanned pages) and form fields from a disclosure PDF."""
     settings = get_settings()
-    content_type = (file.content_type or "").split(";")[0].strip().lower()
-    if content_type and content_type not in _PDF_CONTENT_TYPES:
-        raise HTTPException(status_code=415, detail="Only PDF files are supported.")
-
-    data = file.file.read(settings.pdf_max_bytes + 1)
-    if len(data) > settings.pdf_max_bytes:
-        raise HTTPException(
-            status_code=413,
-            detail=f"PDF exceeds the {settings.pdf_max_bytes // (1024 * 1024)} MB limit.",
-        )
-    if not data.lstrip()[:5].startswith(b"%PDF"):
-        raise HTTPException(status_code=415, detail="File is not a valid PDF.")
-
-    try:
-        extraction = extract_pdf_text(data, settings=settings)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    extraction = read_pdf_upload(file, settings)
 
     try:
         fields = structured_invoke(
@@ -143,7 +115,7 @@ def patent_advisor_extract(file: UploadFile = File(...)) -> PatentDocumentExtrac
         )
     except Exception as exc:  # noqa: BLE001
         logger.exception("patent-advisor extract failed for file=%r", file.filename)
-        raise _llm_http_error(exc) from exc
+        raise llm_http_error(exc) from exc
 
     return PatentDocumentExtractResponse(
         filename=file.filename,

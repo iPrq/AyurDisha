@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import type {
   DimensionRating,
   LegalScope,
+  ProductDocumentExtractResponse,
   ProductReviewResponse,
 } from "@/lib/types";
 import {
@@ -16,6 +17,7 @@ import {
   FindingList,
   IngredientInput,
   LegalScopeSelect,
+  PdfUpload,
   Section,
   SourceIds,
   Sources,
@@ -34,6 +36,15 @@ export default function ProductReviewPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ProductReviewResponse | null>(null);
+  const [doc, setDoc] = useState<ProductDocumentExtractResponse | null>(null);
+
+  function onDoc(next: ProductDocumentExtractResponse | null) {
+    setDoc(next);
+    if (!next) return;
+    if (next.product) setProduct(next.product);
+    if (next.ingredients.length) setIngredients(next.ingredients);
+    if (next.product_category) setCategory(next.product_category);
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,6 +60,7 @@ export default function ProductReviewPage() {
           product_category: category || null,
           target_market: targetMarket || null,
           user_query: query || null,
+          document_text: doc?.document_text ?? null,
         }),
       );
     } catch (err) {
@@ -63,6 +75,15 @@ export default function ProductReviewPage() {
       <h1 className="text-xl font-semibold">Product Review</h1>
 
       <form onSubmit={onSubmit} className="space-y-4">
+        <PdfUpload
+          label="Upload product document (PDF)"
+          hint="Optional. Dossier, label or spec sheet; scanned PDFs are OCR'd. Extracted product, ingredients and category pre-fill the form below for review."
+          doc={doc}
+          extract={api.extractProductReviewDocument}
+          onChange={onDoc}
+          onError={setError}
+          disabled={loading}
+        />
         <Field label="Product">
           <input
             required

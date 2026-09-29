@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
+from api.pdf_upload import extract_product_document
 from config import get_settings
-from graph.models import NbaAbsRequest, NbaAbsResponse
+from graph.models import NbaAbsRequest, NbaAbsResponse, ProductDocumentExtractResponse
 from graph.nba_abs_graph import build_nba_abs_graph
 from knowledge_graph.factory import get_knowledge_graph
 from llm import is_transient_llm_error
@@ -78,3 +79,9 @@ def nba_abs(request: NbaAbsRequest) -> NbaAbsResponse:
                 detail="The LLM provider is temporarily overloaded. Please retry in a minute.",
             ) from exc
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/nba-abs/extract", response_model=ProductDocumentExtractResponse)
+def nba_abs_extract(file: UploadFile = File(...)) -> ProductDocumentExtractResponse:
+    """Extract product name and ingredients from a product document PDF to pre-fill the form."""
+    return extract_product_document(file)

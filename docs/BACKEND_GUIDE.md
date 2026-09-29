@@ -37,6 +37,18 @@ Safety rules baked in:
   - `patentability_risk`: deterministic Section 3 **risk indicator** (weighted 3(d)/3(e)/3(p)), not “probability of approval”
   - `grant_likelihood`: **LLM-estimated** grant probability (`grant_likelihood` node) with confidence, key factors and rationale — uncalibrated against Patent Office outcomes; not computed when no sources are retrieved
 
+### PDF uploads
+
+Each workflow has a multipart `POST .../extract` endpoint (`file` field). It validates the upload (PDF only, `PDF_MAX_BYTES`), extracts text with OCR fallback for scanned pages, and asks the LLM to pull form fields. Validation lives in `api/pdf_upload.py`.
+
+| Endpoint | Extracted fields | How the document is used |
+|---|---|---|
+| `POST /api/v1/patent-advisor/extract` | product, ingredients, summary | Frontend sends `document_text` with `/patent-advisor`; included in Section 3 / prior-art / IP-route / grant prompts |
+| `POST /api/v1/product-review/extract` | product, ingredients, product_category, summary | Frontend sends `document_text` with `/product-review`; included in market / legal / resource prompts |
+| `POST /api/v1/nba-abs/extract` | product, ingredients (product_category, summary also returned) | Pre-fill only; `/nba-abs` does not accept document text |
+
+Document text is prompt context only, never evidence: it is fenced and labelled "do not cite", and citations are still filtered to retrieved source ids.
+
 ---
 
 ## 2. Quick start
@@ -196,7 +208,8 @@ app/
   knowledge_graph/
     base.py                        # BotanicalKnowledgeGraph protocol
     mock.py                        # Ashwagandha → Withania somnifera, etc.
-  api/patent_advisor.py            # POST /api/v1/patent-advisor
+  api/patent_advisor.py            # POST /api/v1/patent-advisor (+ /extract)
+  api/pdf_upload.py                # shared PDF validation + product field extraction
   tests/                           # 32 tests, no paid API
 ```
 

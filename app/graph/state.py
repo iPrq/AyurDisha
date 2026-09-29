@@ -106,6 +106,8 @@ class ProductReviewState(TypedDict):
     target_market: NotRequired[str]
     product_category: NotRequired[str]
     user_query: NotRequired[str]
+    # Uploaded product document text (prompt context only, never evidence)
+    document_text: NotRequired[str]
 
     botanical_input: NotRequired[str]
     parsed_notes: NotRequired[str]

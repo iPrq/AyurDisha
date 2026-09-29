@@ -101,6 +101,7 @@ def run_product_review(
     target_market: str | None = None,
     product_category: str | None = None,
     user_query: str | None = None,
+    document_text: str | None = None,
     kg: BotanicalKnowledgeGraph | None = None,
     retriever: LegalRetriever | None = None,
     searcher: WebSearcher | None = None,
@@ -123,4 +124,6 @@ def run_product_review(
         initial["product_category"] = product_category
     if user_query:
         initial["user_query"] = user_query
+    if document_text:
+        initial["document_text"] = document_text
     return app.invoke(initial)

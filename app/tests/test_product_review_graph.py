@@ -5,10 +5,15 @@ from __future__ import annotations
 from graph.models import (
     BotanicalStatus,
     DimensionRating,
+    LegalComplianceAssessment,
     LegalScope,
+    MarketFeasibilityAssessment,
+    ResourceAccessibilityAssessment,
     VerificationOutcome,
 )
 from graph.product_review_graph import build_product_review_graph
+from graph.prompts import PRODUCT_DOCUMENT_CONTEXT_HEADER
+from tests.conftest import ScriptedLLM
 from retrieval.mock import MockLegalRetriever, get_fixture_corpus
 from websearch.base import NullWebSearcher, WebSearchError
 from websearch.mock import MockWebSearcher
@@ -49,6 +54,35 @@ def test_product_review_domestic(scripted_llm):
     assert "no combined score" in result["combined_summary"]
     assert result["verification_status"] == VerificationOutcome.PASS.value
     assert any("Withania somnifera" in q for q in searcher.queries)
+
+
+def test_product_review_document_text_reaches_dimension_prompts():
+    prompts: dict[str, str] = {}
+    default = ScriptedLLM()
+
+    def _capture(name: str, schema: type):
+        def _fn(user: str):
+            prompts[name] = user
+            return default(schema, "", user)
+
+        return _fn
+
+    llm = ScriptedLLM(
+        {
+            "MarketFeasibilityAssessment": _capture("market", MarketFeasibilityAssessment),
+            "LegalComplianceAssessment": _capture("legal", LegalComplianceAssessment),
+            "ResourceAccessibilityAssessment": _capture(
+                "resource", ResourceAccessibilityAssessment
+            ),
+        }
+    )
+    graph = build_product_review_graph(llm=llm, searcher=MockWebSearcher())
+    graph.invoke({**_REQUEST, "document_text": "Label: contains Withania somnifera root 500 mg."})
+
+    assert set(prompts) == {"market", "legal", "resource"}
+    for user in prompts.values():
+        assert PRODUCT_DOCUMENT_CONTEXT_HEADER in user
+        assert "root 500 mg" in user
 
 
 def test_product_review_ambiguous_botanical_escalates(scripted_llm):

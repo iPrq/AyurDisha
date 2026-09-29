@@ -404,6 +404,33 @@ class PatentDocumentExtractResponse(BaseModel):
     truncated: bool = False
 
 
+class ProductDocumentFields(BaseModel):
+    """LLM extraction of form fields from an uploaded product dossier / label."""
+
+    product: str = Field(default="", description="Short product name")
+    ingredients: list[str] = Field(
+        default_factory=list, description="Botanical / herbal ingredients named in the document"
+    )
+    product_category: str = Field(
+        default="",
+        description="Product category as stated, e.g. 'Ayurvedic proprietary medicine'",
+    )
+    summary: str = Field(default="", description="2-4 sentence summary of the product")
+
+
+class ProductDocumentExtractResponse(BaseModel):
+    filename: str | None = None
+    product: str = ""
+    ingredients: list[str] = Field(default_factory=list)
+    product_category: str = ""
+    summary: str = ""
+    document_text: str
+    pages: list[PdfPageInfo] = Field(default_factory=list)
+    total_pages: int
+    ocr_used: bool = False
+    truncated: bool = False
+
+
 class PatentAdvisorResponse(BaseModel):
     product: str
     ingredients: list[str]
@@ -507,6 +534,11 @@ class ProductReviewRequest(BaseModel):
         description="Optional hint, e.g. 'Ayurvedic proprietary medicine' or 'health supplement'",
     )
     user_query: str | None = None
+    document_text: str | None = Field(
+        default=None,
+        max_length=200_000,
+        description="Text extracted from an uploaded product document PDF; context only, never evidence",
+    )
 
 
 class ProductReviewResponse(BaseModel):

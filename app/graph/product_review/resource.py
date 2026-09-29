@@ -10,6 +10,7 @@ from graph.product_review.common import (
     botanical_context,
     filter_ids,
     finalize_rating,
+    product_document_context,
     resource_names,
     sanitize_findings,
 )
@@ -48,6 +49,7 @@ def assess_resource_accessibility(
             botanical_context(state),
             "Assess availability, cultivation/supply, geography and sustainability per plant "
             "from the sources below only.",
+            *product_document_context(state),
             "Retrieved sources:",
             format_sources_for_prompt(sources),
         ]

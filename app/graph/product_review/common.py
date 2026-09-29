@@ -11,6 +11,7 @@ from graph.models import (
     RetrievedSource,
     ReviewFinding,
 )
+from graph.prompts import PRODUCT_DOCUMENT_CONTEXT_HEADER, document_context_block
 
 
 def coerce_scope(value: Any) -> LegalScope:
@@ -70,3 +71,9 @@ def botanical_context(state: dict[str, Any]) -> str:
             f"synonyms={b.synonyms} phytochemicals={b.phytochemicals}"
         )
     return "\n".join(lines) or "(no botanical normalization results)"
+
+
+def product_document_context(state: dict[str, Any]) -> list[str]:
+    return document_context_block(
+        state.get("document_text"), header=PRODUCT_DOCUMENT_CONTEXT_HEADER
+    )

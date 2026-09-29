@@ -11,6 +11,7 @@ from graph.product_review.common import (
     coerce_scope,
     finalize_rating,
     merge_sources,
+    product_document_context,
     sanitize_findings,
     target_market,
 )
@@ -80,6 +81,7 @@ def assess_legal_compliance(
             "Botanical normalization:",
             botanical_context(state),
             "Identify regulatory category, requirements and restrictions from sources only.",
+            *product_document_context(state),
             "Retrieved sources:",
             format_sources_for_prompt(sources),
         ]

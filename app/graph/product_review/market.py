@@ -10,6 +10,7 @@ from graph.product_review.common import (
     botanical_context,
     filter_ids,
     finalize_rating,
+    product_document_context,
     resource_names,
     sanitize_findings,
     target_market,
@@ -56,6 +57,7 @@ def assess_market_feasibility(
             botanical_context(state),
             "Assess market feasibility from the sources below only. "
             "Cite evidence_source_ids for competitors, demand indicators and findings.",
+            *product_document_context(state),
             "Retrieved sources:",
             format_sources_for_prompt(sources),
         ]

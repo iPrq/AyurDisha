@@ -4,6 +4,7 @@ import type {
   PatentAdvisorRequest,
   PatentAdvisorResponse,
   PatentDocumentExtractResponse,
+  ProductDocumentExtractResponse,
   ProductReviewRequest,
   ProductReviewResponse,
 } from "./types";
@@ -48,20 +49,30 @@ function formatError(status: number, data: unknown): string {
 const post = <T>(path: string, body: unknown) =>
   request<T>(path, { method: "POST", body: JSON.stringify(body) });
 
+const uploadPdf = <T>(path: string, file: File) => {
+  const form = new FormData();
+  form.append("file", file);
+  return request<T>(path, { method: "POST", body: form });
+};
+
 export const api = {
   health: () => request<{ status: string }>("/health"),
   productReview: (body: ProductReviewRequest) =>
     post<ProductReviewResponse>("/api/v1/product-review", body),
+  extractProductReviewDocument: (file: File) =>
+    uploadPdf<ProductDocumentExtractResponse>(
+      "/api/v1/product-review/extract",
+      file,
+    ),
   patentAdvisor: (body: PatentAdvisorRequest) =>
     post<PatentAdvisorResponse>("/api/v1/patent-advisor", body),
-  extractPatentDocument: (file: File) => {
-    const form = new FormData();
-    form.append("file", file);
-    return request<PatentDocumentExtractResponse>(
+  extractPatentDocument: (file: File) =>
+    uploadPdf<PatentDocumentExtractResponse>(
       "/api/v1/patent-advisor/extract",
-      { method: "POST", body: form },
-    );
-  },
+      file,
+    ),
   nbaAbs: (body: NbaAbsRequest) =>
     post<NbaAbsResponse>("/api/v1/nba-abs", body),
+  extractNbaAbsDocument: (file: File) =>
+    uploadPdf<ProductDocumentExtractResponse>("/api/v1/nba-abs/extract", file),
 };
