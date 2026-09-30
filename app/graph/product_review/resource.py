@@ -11,6 +11,7 @@ from graph.product_review.common import (
     coerce_scope,
     filter_ids,
     finalize_rating,
+    invoke_assessment,
     is_international,
     product_document_context,
     resource_names,
@@ -20,7 +21,7 @@ from graph.product_review.common import (
 )
 from graph.prompts import RESOURCE_ACCESSIBILITY_SYSTEM
 from llm.provider import get_chat_model
-from llm.structured import format_sources_for_prompt, structured_invoke
+from llm.structured import format_sources_for_prompt
 from websearch.base import WebSearcher, search_many
 
 
@@ -63,7 +64,7 @@ def assess_resource_accessibility(
             format_sources_for_prompt(sources),
         ]
     )
-    result = structured_invoke(
+    result = invoke_assessment(
         llm,
         ResourceAccessibilityAssessment,
         system=RESOURCE_ACCESSIBILITY_SYSTEM,

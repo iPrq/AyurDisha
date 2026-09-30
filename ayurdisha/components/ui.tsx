@@ -242,6 +242,120 @@ export function Section({
   );
 }
 
+export function SubHeading({
+  children,
+  count,
+}: {
+  children: React.ReactNode;
+  count?: number;
+}) {
+  return (
+    <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-leaf">
+      {children}
+      {count !== undefined && (
+        <span className="rounded-full bg-mint px-2 py-0.5 text-[11px] font-semibold text-muted">
+          {count}
+        </span>
+      )}
+    </h3>
+  );
+}
+
+/** Headed list that shows the first `limit` items and hides the rest behind a toggle. */
+export function PreviewList<T>({
+  title,
+  items,
+  limit = 3,
+  render,
+  variant = "bullets",
+}: {
+  title: string;
+  items: T[];
+  limit?: number;
+  render: (item: T, index: number) => React.ReactNode;
+  variant?: "bullets" | "cards" | "chips";
+}) {
+  const [open, setOpen] = useState(false);
+  if (!items.length) return null;
+  const shown = open ? items : items.slice(0, limit);
+  const hidden = items.length - limit;
+  const listClass = {
+    bullets: "list-disc space-y-1.5 pl-5 text-sm leading-relaxed",
+    cards: "grid gap-2 sm:grid-cols-2",
+    chips: "flex flex-wrap gap-2",
+  }[variant];
+  const itemClass = {
+    bullets: "",
+    cards: "rounded-2xl border border-line bg-mint/40 p-3 text-sm",
+    chips: "rounded-full border border-line bg-mint/60 px-3 py-1 text-sm",
+  }[variant];
+  return (
+    <div className="space-y-2">
+      <SubHeading count={items.length}>{title}</SubHeading>
+      <ul className={listClass}>
+        {shown.map((item, i) => (
+          <li key={i} className={itemClass}>
+            {render(item, i)}
+          </li>
+        ))}
+      </ul>
+      {hidden > 0 && (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="text-sm font-medium text-leaf hover:underline"
+        >
+          {open ? "Show less" : `Show ${hidden} more`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Secondary detail collapsed behind a toggle. */
+export function MoreDetails({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="group rounded-2xl border border-line/70 px-4 py-3">
+      <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-leaf">
+        {label}
+        <span className="text-muted transition-transform group-open:rotate-180">▾</span>
+      </summary>
+      <div className="mt-3 space-y-3">{children}</div>
+    </details>
+  );
+}
+
+export function CollapsibleSources({
+  items,
+  terms,
+}: {
+  items: RetrievedSource[];
+  terms?: string[];
+}) {
+  if (!items.length) return null;
+  return (
+    <details className="group rounded-3xl border border-line bg-surface p-5 shadow-soft sm:p-6">
+      <summary className="flex cursor-pointer list-none items-center justify-between">
+        <h2 className="font-display text-lg font-bold">Sources ({items.length})</h2>
+        <span className="text-sm font-medium text-leaf">
+          <span className="group-open:hidden">Show</span>
+          <span className="hidden group-open:inline">Hide</span>
+        </span>
+      </summary>
+      <div className="mt-4">
+        <SourceList items={items} terms={terms} />
+      </div>
+    </details>
+  );
+}
+
 export function SourceIds({ ids }: { ids: string[] }) {
   if (!ids.length) return null;
   return (
@@ -392,6 +506,19 @@ export function Sources({
         </span>
       }
     >
+      <SourceList items={items} terms={terms} />
+    </Section>
+  );
+}
+
+function SourceList({
+  items,
+  terms,
+}: {
+  items: RetrievedSource[];
+  terms?: string[];
+}) {
+  return (
       <ul className="space-y-2">
         {items.map((s) => (
           <li
@@ -449,7 +576,6 @@ export function Sources({
           </li>
         ))}
       </ul>
-    </Section>
   );
 }
 

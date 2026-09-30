@@ -11,6 +11,7 @@ from graph.product_review.common import (
     coerce_scope,
     filter_ids,
     finalize_rating,
+    invoke_assessment,
     product_document_context,
     resource_names,
     sanitize_findings,
@@ -19,7 +20,7 @@ from graph.product_review.common import (
 )
 from graph.prompts import MARKET_FEASIBILITY_SYSTEM
 from llm.provider import get_chat_model
-from llm.structured import format_sources_for_prompt, structured_invoke
+from llm.structured import format_sources_for_prompt
 from websearch.base import WebSearcher, search_many
 
 
@@ -58,13 +59,15 @@ def assess_market_feasibility(
             "Botanical normalization:",
             botanical_context(state),
             "Assess market feasibility from the sources below only. "
-            "Cite evidence_source_ids for competitors, demand indicators and findings.",
+            "Cite evidence_source_ids for competitors, demand indicators and findings. "
+            "List at most 8 of the most relevant competitor products or brands. "
+            "Always give a rating and a summary.",
             *product_document_context(state),
             "Retrieved sources:",
             format_sources_for_prompt(sources),
         ]
     )
-    result = structured_invoke(
+    result = invoke_assessment(
         llm, MarketFeasibilityAssessment, system=MARKET_FEASIBILITY_SYSTEM, user=user
     )
     result.target_market = result.target_market or market

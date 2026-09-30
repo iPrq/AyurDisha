@@ -23,13 +23,16 @@ import type {
 import {
   Badge,
   Botanicals,
+  CollapsibleSources,
   ErrorBanner,
   Field,
   IngredientInput,
+  MoreDetails,
   PdfUpload,
+  PreviewList,
   Section,
   SourceScopeToggle,
-  Sources,
+  SubHeading,
   SubmitButton,
   formCardClass,
   inputClass,
@@ -242,6 +245,24 @@ function cleanAnswer(text: string): string {
     .trim();
 }
 
+const RATING_TEXT: Record<DimensionRating, string> = {
+  FAVORABLE: "text-[#1E6B43] dark:text-leaf",
+  MODERATE: "text-[#8A520A] dark:text-turmeric",
+  CHALLENGING: "text-[#A5401A] dark:text-[#F4A585]",
+  INSUFFICIENT_EVIDENCE: "text-muted",
+};
+
+function RatingTile({ label, rating }: { label: string; rating: DimensionRating | undefined }) {
+  return (
+    <div className="rounded-2xl border border-line bg-mint/40 p-4">
+      <div className="text-xs font-semibold uppercase tracking-wider text-muted">{label}</div>
+      <div className={`mt-1 font-display text-lg font-bold ${rating ? RATING_TEXT[rating] : "text-muted"}`}>
+        {rating ? rating.replaceAll("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) : "Not assessed"}
+      </div>
+    </div>
+  );
+}
+
 function Dimension({
   title,
   rating,
@@ -255,11 +276,13 @@ function Dimension({
 }) {
   return (
     <Section title={title} right={<Badge value={rating} />}>
-      {summary && <p className="text-sm">{cleanAnswer(summary)}</p>}
+      {summary && <p className="text-sm leading-relaxed">{cleanAnswer(summary)}</p>}
       {children}
     </Section>
   );
 }
+
+const findingText = (f: { summary: string }) => cleanAnswer(f.summary);
 
 function Results({ r }: { r: ProductReviewResponse }) {
   const m = r.market_feasibility;
@@ -273,108 +296,47 @@ function Results({ r }: { r: ProductReviewResponse }) {
 
   return (
     <div className="space-y-4">
-      {/* Summary */}
-      {(r.combined_summary || r.final_answer) && (
-        <Section title="Summary">
-          {r.combined_summary && (
-            <div className="mb-4 text-sm text-neutral-600 dark:text-neutral-400">
-              {cleanAnswer(r.combined_summary)}
-            </div>
-          )}
-          {r.final_answer && (
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <LinkifiedText extraTerms={terms} text={cleanAnswer(r.final_answer)} />
-            </div>
-          )}
-          {r.disclaimer && (
-            <div className="mt-4 text-xs text-neutral-500 italic">
-              {cleanAnswer(r.disclaimer)}
-            </div>
-          )}
-        </Section>
-      )}
-
-      {/* Verification */}
-      {v && (
-        <Section title="Verification" right={<Badge value={v.outcome} />}>
-          <details className="group">
-            <summary className="cursor-pointer text-sm font-medium hover:underline text-leaf list-none flex items-center justify-between">
-              <span>{supported.length} supported &middot; {unsupported.length} unsupported claims</span>
-            </summary>
-            <div className="mt-4 space-y-4">
-              {supported.length > 0 && (
-                <div className="rounded-md border-l-4 border-green-500 bg-green-50/50 p-4 dark:bg-green-950/20">
-                  <h4 className="text-sm font-medium text-green-800 dark:text-green-300 mb-2">Supported claims</h4>
-                  <ul className="list-disc pl-5 text-sm space-y-1 text-green-900/80 dark:text-green-100/80">
-                    {supported.map((c, i) => (
-                      <li key={i}>{cleanAnswer(c.claim)}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {unsupported.length > 0 && (
-                <div className="rounded-md border-l-4 border-red-500 bg-red-50/50 p-4 dark:bg-red-950/20">
-                  <h4 className="text-sm font-medium text-red-800 dark:text-red-300 mb-2">Unsupported / Partial claims</h4>
-                  <ul className="list-disc pl-5 text-sm space-y-1 text-red-900/80 dark:text-red-100/80">
-                    {unsupported.map((c, i) => (
-                      <li key={i}>{cleanAnswer(c.claim)}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </details>
-
-          {v.stripped_unsupported_claims.length > 0 && (
-            <details className="mt-3 group">
-              <summary className="cursor-pointer text-xs text-muted hover:underline">
-                {v.stripped_unsupported_claims.length} removed unsupported claim{v.stripped_unsupported_claims.length === 1 ? "" : "s"}
-              </summary>
-              <ul className="mt-2 list-disc pl-5 text-sm text-neutral-600 line-through dark:text-neutral-400">
-                {v.stripped_unsupported_claims.map((c, i) => (
-                  <li key={i}>{cleanAnswer(c)}</li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </Section>
-      )}
+      <Section title="Overview">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <RatingTile label="Market" rating={m?.rating} />
+          <RatingTile label="Legal" rating={l?.rating} />
+          <RatingTile label="Resources" rating={res?.rating} />
+        </div>
+        <p className="text-xs text-muted">
+          Each dimension is rated independently; there is no combined score.
+        </p>
+      </Section>
 
       {m && (
         <Dimension title="Market feasibility" rating={m.rating} summary={m.summary}>
-          {m.competitors?.length > 0 && (
-            <details className="mt-3 group">
-              <summary className="cursor-pointer text-sm font-medium text-leaf hover:underline">View {m.competitors.length} competitors</summary>
-              <ul className="mt-3 list-disc pl-5 text-sm space-y-1">
-                {m.competitors.map((c, i) => (
-                  <li key={i}>
-                    <span className="font-medium">{c.name}</span>
-                    {c.company && ` (${c.company})`}
-                    {c.notes && ` - ${cleanAnswer(c.notes)}`}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-          {m.demand_indicators?.length > 0 && (
-            <details className="mt-3 group">
-              <summary className="cursor-pointer text-sm font-medium text-leaf hover:underline">View {m.demand_indicators.length} demand indicators</summary>
-              <ul className="mt-3 list-disc pl-5 text-sm space-y-1">
-                {m.demand_indicators.map((c, i) => (
-                  <li key={i}>{cleanAnswer(c.summary)}</li>
-                ))}
-              </ul>
-            </details>
-          )}
-          {m.findings?.length > 0 && (
-            <details className="mt-3 group">
-              <summary className="cursor-pointer text-sm font-medium text-leaf hover:underline">View {m.findings.length} findings</summary>
-              <ul className="mt-3 list-disc pl-5 text-sm space-y-1">
-                {m.findings.map((c, i) => (
-                  <li key={i}>{cleanAnswer(c.summary)}</li>
-                ))}
-              </ul>
-            </details>
+          <PreviewList
+            title="Competitors"
+            items={m.competitors}
+            limit={4}
+            variant="cards"
+            render={(c) => (
+              <>
+                <div className="font-semibold">{c.name}</div>
+                {c.company && <div className="text-xs text-muted">{c.company}</div>}
+                {c.notes && (
+                  <div className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
+                    {cleanAnswer(c.notes)}
+                  </div>
+                )}
+              </>
+            )}
+          />
+          <PreviewList title="Findings" items={m.findings} render={findingText} />
+          <PreviewList
+            title="Demand indicators"
+            items={m.demand_indicators}
+            limit={2}
+            render={findingText}
+          />
+          {m.target_category && (
+            <p className="text-sm">
+              <span className="font-semibold">Target category:</span> {m.target_category}
+            </p>
           )}
         </Dimension>
       )}
@@ -382,94 +344,120 @@ function Results({ r }: { r: ProductReviewResponse }) {
       {l && (
         <Dimension title="Legal compliance" rating={l.rating} summary={l.summary}>
           {l.regulatory_category && (
-            <p className="mt-3 text-sm">
-              <span className="font-medium">Regulatory category:</span>{" "}
-              {l.regulatory_category}
-            </p>
+            <div className="space-y-1">
+              <SubHeading>Regulatory category</SubHeading>
+              <p className="text-sm">{l.regulatory_category}</p>
+            </div>
           )}
-          {l.requirements?.length > 0 && (
-            <details className="mt-3 group">
-              <summary className="cursor-pointer text-sm font-medium text-leaf hover:underline">View {l.requirements.length} requirements</summary>
-              <ul className="mt-3 list-disc pl-5 text-sm space-y-1">
-                {l.requirements.map((c, i) => (
-                  <li key={i}>{cleanAnswer(c.summary)}</li>
-                ))}
-              </ul>
-            </details>
-          )}
-          {l.restrictions?.length > 0 && (
-            <details className="mt-3 group">
-              <summary className="cursor-pointer text-sm font-medium text-leaf hover:underline">View {l.restrictions.length} restrictions</summary>
-              <ul className="mt-3 list-disc pl-5 text-sm space-y-1">
-                {l.restrictions.map((c, i) => (
-                  <li key={i}>{cleanAnswer(c.summary)}</li>
-                ))}
-              </ul>
-            </details>
-          )}
+          <PreviewList title="Requirements" items={l.requirements} render={findingText} />
+          <PreviewList title="Restrictions" items={l.restrictions} limit={2} render={findingText} />
         </Dimension>
       )}
 
       {res && (
-        <Dimension
-          title="Resource accessibility"
-          rating={res.rating}
-          summary={res.summary}
-        >
-          {res.resources?.length > 0 && (
-            <details className="mt-3 group">
-              <summary className="cursor-pointer text-sm font-medium text-leaf hover:underline">View {res.resources.length} resources</summary>
-              <ul className="mt-3 space-y-2 text-sm">
-                {res.resources.map((x, i) => (
-                  <li key={i}>
-                    <EntityLink
-                      term={x.botanical_name ?? x.ingredient}
-                      label="Herb"
-                      className="font-medium"
-                    >
-                      {x.ingredient}
-                    </EntityLink>
-                    {x.botanical_name && <em> ({x.botanical_name})</em>}
-                    <div className="mt-1 text-neutral-600 dark:text-neutral-400">
-                      {[
-                        x.availability && `Availability: ${cleanAnswer(x.availability)}`,
-                        x.cultivation && `Cultivation: ${cleanAnswer(x.cultivation)}`,
-                        x.sustainability_concerns &&
-                          `Sustainability: ${cleanAnswer(x.sustainability_concerns)}`,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
+        <Dimension title="Resource accessibility" rating={res.rating} summary={res.summary}>
+          <PreviewList
+            title="Ingredients"
+            items={res.resources}
+            limit={2}
+            variant="cards"
+            render={(x) => (
+              <div className="space-y-1">
+                <div>
+                  <EntityLink
+                    term={x.botanical_name ?? x.ingredient}
+                    label="Herb"
+                    className="font-semibold"
+                  >
+                    {x.ingredient}
+                  </EntityLink>
+                  {x.botanical_name && (
+                    <em className="text-muted"> ({x.botanical_name})</em>
+                  )}
+                </div>
+                {x.availability && (
+                  <p className="text-xs">
+                    <span className="font-semibold">Availability:</span>{" "}
+                    {cleanAnswer(x.availability)}
+                  </p>
+                )}
+                {(x.cultivation || x.sustainability_concerns) && (
+                  <details className="text-xs">
+                    <summary className="cursor-pointer font-medium text-leaf">
+                      Cultivation & sustainability
+                    </summary>
+                    <div className="mt-1 space-y-1 text-neutral-600 dark:text-neutral-400">
+                      {x.cultivation && <p>{cleanAnswer(x.cultivation)}</p>}
+                      {x.sustainability_concerns && (
+                        <p>{cleanAnswer(x.sustainability_concerns)}</p>
+                      )}
                     </div>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-          {res.findings?.length > 0 && (
-            <details className="mt-3 group">
-              <summary className="cursor-pointer text-sm font-medium text-leaf hover:underline">View {res.findings.length} findings</summary>
-              <ul className="mt-3 list-disc pl-5 text-sm space-y-1">
-                {res.findings.map((c, i) => (
-                  <li key={i}>{cleanAnswer(c.summary)}</li>
-                ))}
-              </ul>
-            </details>
-          )}
+                  </details>
+                )}
+              </div>
+            )}
+          />
+          <PreviewList title="Findings" items={res.findings} render={findingText} />
         </Dimension>
       )}
 
       <Botanicals items={r.botanicals} />
-      
-      {r.retrieved_sources?.length > 0 && (
-        <details className="group">
-          <summary className="cursor-pointer text-sm font-medium text-leaf hover:underline">
-            View {r.retrieved_sources.length} sources
-          </summary>
-          <div className="mt-4">
-            <Sources items={r.retrieved_sources} terms={terms} />
-          </div>
-        </details>
+
+      {v && (
+        <Section title="Verification" right={<Badge value={v.outcome} />}>
+          <p className="text-sm">
+            <span className="font-medium text-green-700">{supported.length} supported</span>
+            {" · "}
+            <span className="font-medium text-red-600">{unsupported.length} unsupported</span>
+          </p>
+          {v.claims.length > 0 && (
+            <MoreDetails label="View all claims">
+              {supported.length > 0 && (
+                <div className="space-y-1.5">
+                  <SubHeading>Supported</SubHeading>
+                  {supported.map((c, i) => (
+                    <div key={i} className="border-l-2 border-green-500 pl-3 text-sm">
+                      {cleanAnswer(c.claim)}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {unsupported.length > 0 && (
+                <div className="space-y-1.5">
+                  <SubHeading>Unsupported / partial</SubHeading>
+                  {unsupported.map((c, i) => (
+                    <div key={i} className="border-l-2 border-red-400 pl-3 text-sm">
+                      {cleanAnswer(c.claim)}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {v.stripped_unsupported_claims.length > 0 && (
+                <div className="space-y-1.5">
+                  <SubHeading>Removed claims</SubHeading>
+                  <ul className="list-disc pl-5 text-sm text-neutral-600 line-through dark:text-neutral-400">
+                    {v.stripped_unsupported_claims.map((c, i) => (
+                      <li key={i}>{cleanAnswer(c)}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </MoreDetails>
+          )}
+        </Section>
       )}
+
+      {r.final_answer && (
+        <MoreDetails label="Full report">
+          <div className="whitespace-pre-wrap text-sm leading-relaxed">
+            <LinkifiedText extraTerms={terms} text={cleanAnswer(r.final_answer)} />
+          </div>
+        </MoreDetails>
+      )}
+      {r.disclaimer && <p className="text-xs italic text-neutral-500">{cleanAnswer(r.disclaimer)}</p>}
+
+      <CollapsibleSources items={r.retrieved_sources ?? []} terms={terms} />
     </div>
   );
 }
+

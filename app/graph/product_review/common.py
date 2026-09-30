@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any
+from functools import lru_cache
+from typing import Any, TypeVar
+
+from pydantic import BaseModel, Field, create_model
 
 from graph.models import (
     BotanicalResult,
@@ -12,7 +15,43 @@ from graph.models import (
     ReviewFinding,
 )
 from graph.prompts import PRODUCT_DOCUMENT_CONTEXT_HEADER, document_context_block
+from llm.structured import structured_invoke
 from websearch.base import NO_COUNTRY_BIAS
+
+A = TypeVar("A", bound=BaseModel)
+
+
+@lru_cache(maxsize=None)
+def _draft_schema(schema: type[BaseModel]) -> type[BaseModel]:
+    # Defaulted fields read as optional to the LLM, which then skips rating/summary entirely.
+    return create_model(
+        schema.__name__,
+        __base__=schema,
+        rating=(
+            DimensionRating,
+            Field(
+                ...,
+                description="FAVORABLE, MODERATE or CHALLENGING when the sources support a "
+                "judgement; INSUFFICIENT_EVIDENCE only when no source is relevant.",
+            ),
+        ),
+        summary=(
+            str,
+            Field(..., min_length=1, description="2-4 sentence assessment grounded in the sources."),
+        ),
+        insufficient_evidence=(
+            bool,
+            Field(
+                default=False,
+                description="true only when none of the retrieved sources are relevant.",
+            ),
+        ),
+    )
+
+
+def invoke_assessment(llm: Any, schema: type[A], *, system: str, user: str) -> A:
+    draft = structured_invoke(llm, _draft_schema(schema), system=system, user=user)
+    return schema.model_validate(draft.model_dump())
 
 
 def coerce_scope(value: Any) -> LegalScope:

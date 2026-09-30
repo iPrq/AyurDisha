@@ -10,6 +10,7 @@ from graph.product_review.common import (
     botanical_context,
     coerce_scope,
     finalize_rating,
+    invoke_assessment,
     merge_sources,
     product_document_context,
     sanitize_findings,
@@ -17,7 +18,7 @@ from graph.product_review.common import (
 )
 from graph.prompts import LEGAL_COMPLIANCE_SYSTEM, legal_scope_instruction
 from llm.provider import get_chat_model
-from llm.structured import format_sources_for_prompt, structured_invoke
+from llm.structured import format_sources_for_prompt
 from retrieval.base import LegalRetriever
 from retrieval.mock import get_mock_retriever
 from websearch.base import NO_COUNTRY_BIAS, WebSearcher, search_many
@@ -78,7 +79,7 @@ def assess_legal_compliance(
             format_sources_for_prompt(sources),
         ]
     )
-    result = structured_invoke(
+    result = invoke_assessment(
         llm, LegalComplianceAssessment, system=LEGAL_COMPLIANCE_SYSTEM, user=user
     )
     result.legal_scope = scope
