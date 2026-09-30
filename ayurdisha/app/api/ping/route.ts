@@ -11,7 +11,7 @@ export async function GET() {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout so Vercel doesn't kill it
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     const res = await fetch(`${BACKEND_URL}/health`, {
       signal: controller.signal,
@@ -23,7 +23,7 @@ export async function GET() {
       return NextResponse.json({ status: "ok" });
     }
     return NextResponse.json({ status: "error" }, { status: 502 });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ status: "waking" }, { status: 503 });
   }
 }
