@@ -220,8 +220,46 @@ function Results({ r }: { r: PatentAdvisorResponse }) {
   const unsupported =
     v?.claims.filter((c) => c.status !== "SUPPORTED") ?? [];
 
+  const needsReview =
+    v?.outcome === "HUMAN_REVIEW_REQUIRED" ||
+    (risk?.unweighted_triggered_clauses.length ?? 0) > 0;
+
   return (
     <div className="space-y-4">
+      {/* ── 0. Human Review Alert ── */}
+      {needsReview && (
+        <div className="flex flex-col gap-3 rounded-3xl border border-turmeric/40 bg-turmeric/10 p-5 text-sm shadow-soft">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-turmeric text-xl text-canvas shadow-inner">
+              ⚠️
+            </span>
+            <h3 className="font-display text-lg font-bold text-[#8A520A]">
+              Human Expert Review Required
+            </h3>
+          </div>
+          <p className="text-[#8A520A] opacity-90 leading-relaxed">
+            AyurDisha has flagged ambiguities or Section 3 clauses that require expert evaluation to ensure zero hallucination. This analysis is decision-support, not legal advice. For definitive legal clearance, please consult a registered patent agent and official authorities.
+          </p>
+          <div className="mt-2 space-y-2">
+            <h4 className="font-semibold text-[#8A520A]">Official Resources for Guidance:</h4>
+            <div className="flex flex-wrap gap-2">
+              <a href="https://ipindia.gov.in/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-xl bg-surface px-4 py-2 font-medium text-leaf shadow-soft transition-transform hover:-translate-y-0.5 hover:text-leaf-bright border border-line">
+                Patent Office (CGPDTM) ↗
+              </a>
+              <a href="https://ayush.gov.in/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-xl bg-surface px-4 py-2 font-medium text-leaf shadow-soft transition-transform hover:-translate-y-0.5 hover:text-leaf-bright border border-line">
+                Ministry of AYUSH ↗
+              </a>
+              <a href="https://www.tkdl.res.in/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-xl bg-surface px-4 py-2 font-medium text-leaf shadow-soft transition-transform hover:-translate-y-0.5 hover:text-leaf-bright border border-line">
+                TKDL Database ↗
+              </a>
+              <a href="https://nbaindia.org/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-xl bg-surface px-4 py-2 font-medium text-leaf shadow-soft transition-transform hover:-translate-y-0.5 hover:text-leaf-bright border border-line">
+                National Biodiversity Authority ↗
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── 1. Verdict Card (always visible) ── */}
       {grant && (
         <Section
