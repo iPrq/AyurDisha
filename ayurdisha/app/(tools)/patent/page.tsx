@@ -9,7 +9,7 @@ import {
 } from "@/components/formulation/ToolBridge";
 import { api } from "@/lib/api";
 import { toolStreams } from "@/lib/formulation/api";
-import { botanicalTerms } from "@/components/knowledge-graph/KnowledgeGraphProvider";
+import { botanicalTerms, LinkifiedText } from "@/components/knowledge-graph/KnowledgeGraphProvider";
 import type {
   LegalScope,
   PatentAdvisorResponse,
@@ -20,15 +20,12 @@ import {
   Botanicals,
   ErrorBanner,
   Field,
-  FinalAnswer,
   IngredientInput,
   PdfUpload,
   Section,
-  SourceIds,
   SourceScopeToggle,
   Sources,
   SubmitButton,
-  Verification,
   formCardClass,
   inputClass,
 } from "@/components/ui";
@@ -202,21 +199,41 @@ export default function PatentAdvisorPage() {
   );
 }
 
+/** Strip inline source_id references and evidence blocks the API embeds in final_answer text. */
+function cleanAnswer(text: string): string {
+  return text
+    .replace(/\(source_id=[^)]+\)/g, "")
+    .replace(/Evidence source_ids?:[^\n]*/gi, "")
+    .replace(/\[Unsupported claims were removed[^\]]*\]/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function Results({ r }: { r: PatentAdvisorResponse }) {
   const risk = r.patentability_risk;
   const s3 = r.section3;
   const grant = r.grant_likelihood;
+  const v = r.verification;
+  const terms = botanicalTerms([r.botanical]);
+
+  const supported = v?.claims.filter((c) => c.status === "SUPPORTED") ?? [];
+  const unsupported =
+    v?.claims.filter((c) => c.status !== "SUPPORTED") ?? [];
+
   return (
     <div className="space-y-4">
+      {/* ── 1. Verdict Card (always visible) ── */}
       {grant && (
         <Section
-          title="Estimated grant probability"
-          right={<Badge value={`${grant.confidence.toUpperCase()} CONFIDENCE`} />}
+          title="Verdict"
+          right={
+            <Badge value={`${grant.confidence.toUpperCase()} CONFIDENCE`} />
+          }
         >
           {grant.probability !== null ? (
             <div className="flex items-center gap-3">
               <span
-                className={`font-mono text-3xl font-semibold ${
+                className={`font-mono text-4xl font-bold ${
                   grant.probability >= 0.6
                     ? "text-green-600"
                     : grant.probability >= 0.3
@@ -226,17 +243,24 @@ function Results({ r }: { r: PatentAdvisorResponse }) {
               >
                 {Math.round(grant.probability * 100)}%
               </span>
-              <div className="h-3 flex-1 overflow-hidden rounded bg-neutral-200 dark:bg-neutral-800">
-                <div
-                  className={`h-full ${
-                    grant.probability >= 0.6
-                      ? "bg-green-600"
-                      : grant.probability >= 0.3
-                        ? "bg-amber-500"
-                        : "bg-red-500"
-                  }`}
-                  style={{ width: `${Math.round(grant.probability * 100)}%` }}
-                />
+              <div className="flex-1 space-y-1">
+                <div className="h-3 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+                  <div
+                    className={`h-full transition-all ${
+                      grant.probability >= 0.6
+                        ? "bg-green-600"
+                        : grant.probability >= 0.3
+                          ? "bg-amber-500"
+                          : "bg-red-500"
+                    }`}
+                    style={{
+                      width: `${Math.round(grant.probability * 100)}%`,
+                    }}
+                  />
+                </div>
+                <span className="block text-xs text-muted">
+                  Estimated grant probability
+                </span>
               </div>
             </div>
           ) : (
@@ -244,6 +268,7 @@ function Results({ r }: { r: PatentAdvisorResponse }) {
               Not estimated — insufficient evidence.
             </p>
           )}
+
           {grant.key_factors.length > 0 && (
             <ul className="list-disc space-y-1 pl-5 text-sm">
               {grant.key_factors.map((f, i) => (
@@ -251,22 +276,22 @@ function Results({ r }: { r: PatentAdvisorResponse }) {
               ))}
             </ul>
           )}
+
           {grant.rationale && (
-            <p className="text-sm">
-              {grant.rationale}
-              <SourceIds ids={grant.evidence_source_ids} />
-            </p>
+            <p className="text-sm text-muted">{grant.rationale}</p>
           )}
+
           <p className="text-xs text-neutral-500">{grant.disclaimer}</p>
         </Section>
       )}
 
+      {/* ── 2. Section 3 Risk (collapsible) ── */}
       {risk && (
-        <Section title="Section 3 risk score (rule-based)">
+        <Section title="Section 3 risk">
           <div className="flex items-center gap-3">
-            <div className="h-3 flex-1 overflow-hidden rounded bg-neutral-200 dark:bg-neutral-800">
+            <div className="h-3 flex-1 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
               <div
-                className={`h-full ${
+                className={`h-full transition-all ${
                   risk.score >= 0.6
                     ? "bg-red-500"
                     : risk.score >= 0.3
@@ -278,109 +303,256 @@ function Results({ r }: { r: PatentAdvisorResponse }) {
             </div>
             <span className="font-mono text-sm">{risk.score.toFixed(2)}</span>
           </div>
+
           {risk.triggered_clauses.length > 0 && (
             <p className="text-sm">
               Triggered clauses: {risk.triggered_clauses.join(", ")}
             </p>
           )}
+
+          {/* Expand for full Section 3 provision analysis */}
+          {s3 && (
+            <details>
+              <summary className="cursor-pointer text-sm font-medium text-leaf hover:underline">
+                View full provision analysis
+              </summary>
+              <div className="mt-3 space-y-3">
+                {s3.summary && <p className="text-sm">{s3.summary}</p>}
+                <ul className="space-y-2 text-sm">
+                  {s3.provisions.map((p) => (
+                    <li key={p.clause} className="flex gap-3">
+                      <span className="w-12 shrink-0 font-mono font-medium">
+                        {p.clause}
+                      </span>
+                      <span className="w-28 shrink-0">
+                        {p.triggered ? (
+                          <Badge value="TRIGGERED" />
+                        ) : p.evidence_gap ? (
+                          <Badge value="EVIDENCE_GAP" />
+                        ) : (
+                          <span className="text-xs text-neutral-500">
+                            not triggered
+                          </span>
+                        )}
+                      </span>
+                      <span className="flex-1">{p.reason}</span>
+                    </li>
+                  ))}
+                </ul>
+                {s3.rejected_clauses.length > 0 && (
+                  <p className="text-xs text-neutral-500">
+                    Ignored unsupported clauses:{" "}
+                    {s3.rejected_clauses.join(", ")}
+                  </p>
+                )}
+              </div>
+            </details>
+          )}
+
           {risk.unweighted_triggered_clauses.length > 0 && (
             <p className="text-sm text-amber-700">
               Also triggered (not weighted, needs human review):{" "}
               {risk.unweighted_triggered_clauses.join(", ")}
             </p>
           )}
+
           <p className="text-xs text-neutral-500">{risk.disclaimer}</p>
         </Section>
       )}
 
-      {s3 && (
-        <Section title="Section 3 analysis">
-          {s3.summary && <p className="text-sm">{s3.summary}</p>}
-          <ul className="space-y-2 text-sm">
-            {s3.provisions.map((p) => (
-              <li key={p.clause} className="flex gap-3">
-                <span className="w-12 shrink-0 font-mono font-medium">
-                  {p.clause}
-                </span>
-                <span className="w-28 shrink-0">
-                  {p.triggered ? (
-                    <Badge value="TRIGGERED" />
-                  ) : p.evidence_gap ? (
-                    <Badge value="EVIDENCE_GAP" />
-                  ) : (
-                    <span className="text-xs text-neutral-500">
-                      not triggered
-                    </span>
-                  )}
-                </span>
-                <span className="flex-1">
-                  {p.reason}
-                  <SourceIds ids={p.evidence_source_ids} />
-                </span>
-              </li>
-            ))}
-          </ul>
-          {s3.rejected_clauses.length > 0 && (
-            <p className="text-xs text-neutral-500">
-              Ignored unsupported clauses: {s3.rejected_clauses.join(", ")}
-            </p>
-          )}
-        </Section>
-      )}
-
+      {/* ── 3. Prior Art (collapsible) ── */}
       {r.prior_art && (
         <Section title="Prior art">
           {r.prior_art.summary && (
             <p className="text-sm">{r.prior_art.summary}</p>
           )}
-          <ul className="list-disc space-y-1 pl-5 text-sm">
-            {r.prior_art.findings.map((f, i) => (
-              <li key={i}>
-                {f.summary}
-                {f.relevance && (
-                  <span className="text-neutral-500"> ({f.relevance})</span>
-                )}
-                <SourceIds ids={f.evidence_source_ids} />
-              </li>
-            ))}
-          </ul>
+          {r.prior_art.findings.length > 0 && (
+            <details>
+              <summary className="cursor-pointer text-sm font-medium text-leaf hover:underline">
+                {r.prior_art.findings.length} finding
+                {r.prior_art.findings.length === 1 ? "" : "s"} — expand
+              </summary>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">
+                {r.prior_art.findings.map((f, i) => (
+                  <li key={i}>
+                    {f.summary}
+                    {f.relevance && (
+                      <span className="text-neutral-500">
+                        {" "}
+                        ({f.relevance})
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </Section>
       )}
 
+      {/* ── 4. IP Routes (collapsible) ── */}
       {r.ip_routes && (
         <Section title="IP routes">
           {r.ip_routes.summary && (
             <p className="text-sm">{r.ip_routes.summary}</p>
           )}
-          <ul className="space-y-2 text-sm">
-            {r.ip_routes.suggestions.map((s) => (
-              <li key={s.route}>
-                <span className="font-medium">{s.route}</span>{" "}
-                <span
-                  className={
-                    s.appropriate ? "text-green-700" : "text-neutral-500"
-                  }
-                >
-                  {s.appropriate ? "- suitable" : "- not suitable"}
-                </span>
-                <div className="text-neutral-600 dark:text-neutral-400">
-                  {s.rationale}
-                  <SourceIds ids={s.evidence_source_ids} />
-                </div>
-              </li>
-            ))}
-          </ul>
+          {r.ip_routes.suggestions.length > 0 && (
+            <details>
+              <summary className="cursor-pointer text-sm font-medium text-leaf hover:underline">
+                {r.ip_routes.suggestions.length} route suggestion
+                {r.ip_routes.suggestions.length === 1 ? "" : "s"} — expand
+              </summary>
+              <ul className="mt-3 space-y-2 text-sm">
+                {r.ip_routes.suggestions.map((s) => (
+                  <li key={s.route}>
+                    <span className="font-medium">{s.route}</span>{" "}
+                    <span
+                      className={
+                        s.appropriate ? "text-green-700" : "text-neutral-500"
+                      }
+                    >
+                      {s.appropriate ? "— suitable" : "— not suitable"}
+                    </span>
+                    <div className="text-neutral-600 dark:text-neutral-400">
+                      {s.rationale}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </Section>
       )}
 
+      {/* ── 5. Botanicals ── */}
       {r.botanical && <Botanicals items={[r.botanical]} />}
-      <FinalAnswer
-        answer={r.final_answer}
-        disclaimer={r.disclaimer}
-        terms={botanicalTerms([r.botanical])}
-      />
-      <Verification v={r.verification} />
-      <Sources items={r.retrieved_sources} terms={botanicalTerms([r.botanical])} />
+
+      {/* ── 6. Verification (redesigned, collapsible) ── */}
+      {v && (
+        <Section title="Verification" right={<Badge value={v.outcome} />}>
+          <p className="text-sm">
+            <span className="font-medium text-green-700">
+              {supported.length} supported
+            </span>
+            {" · "}
+            <span className="font-medium text-red-600">
+              {unsupported.length} unsupported
+            </span>
+          </p>
+
+          {v.claims.length > 0 && (
+            <details>
+              <summary className="cursor-pointer text-sm font-medium text-leaf hover:underline">
+                View all claims
+              </summary>
+              <div className="mt-3 space-y-2">
+                {supported.length > 0 && (
+                  <div className="space-y-1.5">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-green-700">
+                      Supported
+                    </h4>
+                    {supported.map((c, i) => (
+                      <div
+                        key={i}
+                        className="border-l-2 border-green-500 pl-3 text-sm"
+                      >
+                        {c.claim}
+                        {c.notes && (
+                          <span className="block text-xs text-muted">
+                            {c.notes}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {unsupported.length > 0 && (
+                  <div className="space-y-1.5">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-red-600">
+                      Unsupported / Partial
+                    </h4>
+                    {unsupported.map((c, i) => (
+                      <div
+                        key={i}
+                        className="border-l-2 border-red-400 pl-3 text-sm"
+                      >
+                        <Badge value={c.status} />{" "}
+                        <span>{c.claim}</span>
+                        {c.notes && (
+                          <span className="block text-xs text-muted">
+                            {c.notes}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </details>
+          )}
+
+          {v.stripped_unsupported_claims.length > 0 && (
+            <details>
+              <summary className="cursor-pointer text-xs text-muted hover:underline">
+                {v.stripped_unsupported_claims.length} removed unsupported claim
+                {v.stripped_unsupported_claims.length === 1 ? "" : "s"}
+              </summary>
+              <ul className="mt-2 list-disc pl-5 text-sm text-neutral-600 line-through dark:text-neutral-400">
+                {v.stripped_unsupported_claims.map((c, i) => (
+                  <li key={i}>{c}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          {v.escalation_reasons.length > 0 && (
+            <div className="text-sm">
+              <h3 className="font-medium">Escalation reasons</h3>
+              <ul className="list-disc pl-5">
+                {v.escalation_reasons.map((c, i) => (
+                  <li key={i}>{c}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {v.notes && (
+            <p className="text-sm text-neutral-500">{v.notes}</p>
+          )}
+        </Section>
+      )}
+
+      {/* ── 7. Summary (cleaned of source IDs) ── */}
+      {r.final_answer && (
+        <Section title="Summary">
+          <details>
+            <summary className="cursor-pointer text-sm font-medium text-leaf hover:underline">
+              Read full analysis summary
+            </summary>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">
+              <LinkifiedText
+                text={cleanAnswer(r.final_answer)}
+                extraTerms={terms}
+              />
+            </p>
+          </details>
+        </Section>
+      )}
+      <p className="text-xs text-neutral-500">{r.disclaimer}</p>
+
+      {/* ── 8. Sources (collapsed by default) ── */}
+      <Section title={`Sources (${r.retrieved_sources.length})`}>
+        <details>
+          <summary className="cursor-pointer text-sm font-medium text-leaf hover:underline">
+            View {r.retrieved_sources.length} retrieved source
+            {r.retrieved_sources.length === 1 ? "" : "s"}
+          </summary>
+          <div className="mt-3">
+            <Sources items={r.retrieved_sources} terms={terms} />
+          </div>
+        </details>
+      </Section>
     </div>
   );
 }
+
