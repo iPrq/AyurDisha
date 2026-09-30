@@ -10,6 +10,7 @@ import { KnowledgeGraphProvider } from "@/components/knowledge-graph/KnowledgeGr
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SourceScopeProvider } from "@/components/site/SourceScope";
+import { BackendAwakener } from "@/components/site/BackendAwakener";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -55,6 +56,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: JS_FLAG }} />
       </head>
       <body className="flex min-h-full flex-col bg-canvas font-sans text-ink">
+        <BackendAwakener />
         <KnowledgeGraphProvider>
           <SourceScopeProvider>
             <AgentShell>
