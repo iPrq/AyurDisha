@@ -525,17 +525,12 @@ function Results({ r }: { r: PatentAdvisorResponse }) {
       {/* ── 7. Summary (cleaned of source IDs) ── */}
       {r.final_answer && (
         <Section title="Summary">
-          <details>
-            <summary className="cursor-pointer text-sm font-medium text-leaf hover:underline">
-              Read full analysis summary
-            </summary>
-            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">
-              <LinkifiedText
-                text={cleanAnswer(r.final_answer)}
-                extraTerms={terms}
-              />
-            </p>
-          </details>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">
+            <LinkifiedText
+              text={cleanAnswer(r.final_answer)}
+              extraTerms={terms}
+            />
+          </p>
         </Section>
       )}
       <p className="text-xs text-neutral-500">{r.disclaimer}</p>
