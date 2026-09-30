@@ -128,7 +128,7 @@ def normalize_botanical(
             input_term=cleaned,
             confidence=0.0,
             candidates=list(candidates),
-            notes="No knowledge-graph match and LLM not configured (set NVIDIA_API_KEY).",
+            notes="No knowledge-graph match and LLM not configured (set NVIDIA_API_KEY or GROQ_API_KEY).",
         )
 
     try:

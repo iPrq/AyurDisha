@@ -31,6 +31,12 @@ class Settings(BaseModel):
     # Retries per LLM call on transient errors (429 / 5xx / timeouts), exponential backoff.
     llm_max_retries: int = Field(default=3)
 
+    # Groq (last-resort fallback after every NVIDIA model, or sole provider without NVIDIA)
+    groq_api_key: str | None = Field(default=None)
+    groq_base_url: str = Field(default="https://api.groq.com/openai/v1")
+    groq_model: str = Field(default="llama-3.3-70b-versatile")
+    groq_timeout: float = Field(default=120.0)
+
     # Defaults for Patent Advisor requests
     default_jurisdiction: str = Field(default="india")
     default_language: str = Field(default="en")
@@ -129,6 +135,7 @@ class Settings(BaseModel):
         data = self.model_dump()
         for key in (
             "nvidia_api_key",
+            "groq_api_key",
             "qdrant_api_key",
             "serper_api_key",
             "google_cse_api_key",
@@ -188,6 +195,11 @@ def get_settings() -> Settings:
             m.strip() for m in os.getenv("LLM_FALLBACK_MODELS", "").split(",") if m.strip()
         ],
         llm_max_retries=_env_int("LLM_MAX_RETRIES", 3),
+        groq_api_key=_env_str("GROQ_API_KEY"),
+        groq_base_url=_env_str("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+        or "https://api.groq.com/openai/v1",
+        groq_model=_env_str("GROQ_MODEL", "llama-3.3-70b-versatile") or "llama-3.3-70b-versatile",
+        groq_timeout=_env_float("GROQ_TIMEOUT", 120.0),
         default_jurisdiction=os.getenv("DEFAULT_JURISDICTION", "india"),
         default_language=os.getenv("DEFAULT_LANGUAGE", "en"),
         default_legal_scope=os.getenv("DEFAULT_LEGAL_SCOPE", "domestic"),

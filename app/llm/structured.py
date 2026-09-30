@@ -38,8 +38,8 @@ class LLMNotConfiguredError(RuntimeError):
 def require_llm(llm: Any | None) -> Any:
     if llm is None:
         raise LLMNotConfiguredError(
-            "LLM not configured. Set NVIDIA_API_KEY in .env "
-            "(NVIDIA NIM) and restart the server."
+            "LLM not configured. Set NVIDIA_API_KEY (NVIDIA NIM) and/or "
+            "GROQ_API_KEY (Groq) in .env and restart the server."
         )
     return llm
 
